@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"net/http"
 	"os"
 	"path"
@@ -218,7 +219,7 @@ func archiveCreateHandler(w http.ResponseWriter, r *http.Request, d *Context) (i
 	// Check archive size limit if configured
 	if settings.Config.Server.MaxArchiveSizeGB > 0 {
 		var estimatedSize int64
-		estimatedSize, err = computeArchiveSize(req.FromSource, itemPaths, d)
+		estimatedSize, err = computeArchiveSize(r.Context(), req.FromSource, itemPaths, d)
 		if err != nil {
 			return http.StatusInternalServerError, fmt.Errorf("failed to compute archive size: %v", err)
 		}
@@ -460,9 +461,8 @@ func unarchiveHandler(w http.ResponseWriter, r *http.Request, d *Context) (int, 
 	return RenderJSON(w, r, map[string]string{"path": req.Destination, "source": req.ToSource}, http.StatusOK)
 }
 
-// addFile adds a file or directory to a tar or zip archive, respecting access rules.
-// For shares, path is already resolved; for users, access is checked via state.AccessPermitted.
-func addFile(ctx context.Context, source string, path string, d *Context, tarWriter *tar.Writer, zipWriter *zip.Writer, flatten bool) error {
+// walkArchiveEntries visits the accessible entries used by both archive creation and size checks.
+func walkArchiveEntries(ctx context.Context, source, indexPath string, d *Context, visit func(string, string, fs.FileInfo) error) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -470,27 +470,20 @@ func addFile(ctx context.Context, source string, path string, d *Context, tarWri
 	if idx == nil {
 		return fmt.Errorf("source %s is not available", source)
 	}
-
 	permUser := accessCheckUsername(d)
-	// Check access control directly for each file and silently skip if access is denied
-	if !state.AccessPermitted(idx.Path, utils.IndexPathFromNormalized(path, true), permUser) {
-		return nil // Silently skip this file/folder
+	if !state.AccessPermitted(idx.Path, utils.IndexPathFromNormalized(indexPath, true), permUser) {
+		return nil
 	}
 
-	// Symlink resolution is contained to the share path for shares and the user
-	// scope otherwise; entries that resolve outside the bound are skipped.
-	boundIndexPath := ""
-	if d.Share.Hash != "" {
-		boundIndexPath = d.Share.Path
-	} else {
+	bound := d.Share.Path
+	if d.Share.Hash == "" {
 		var err error
-		boundIndexPath, err = d.User.GetScopeForSourceName(source)
+		bound, err = d.User.GetScopeForSourceName(source)
 		if err != nil {
 			return err
 		}
 	}
-
-	realPath, _, err := idx.GetRealPathScoped(boundIndexPath, path)
+	realPath, _, err := idx.GetRealPathScoped(bound, indexPath)
 	if err != nil {
 		return err
 	}
@@ -498,88 +491,80 @@ func addFile(ctx context.Context, source string, path string, d *Context, tarWri
 	if err != nil {
 		return err
 	}
-
-	// Get the base name of the top-level folder or file
 	baseName := filepath.Base(realPath)
-
-	if info.IsDir() {
-		// Walk through directory contents
-		return filepath.Walk(realPath, func(filePath string, fileInfo os.FileInfo, err error) error {
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				return ctxErr
-			}
-			if err != nil {
-				return err
-			}
-
-			// Calculate the relative path
-			relPath, err := filepath.Rel(realPath, filePath)
-			if err != nil {
-				return err
-			}
-
-			// Normalize for tar: convert \ to /
-			relPath = filepath.ToSlash(relPath)
-
-			// Skip adding `.` (current directory)
-			if relPath == "." {
-				return nil
-			}
-
-			// A symlinked entry must resolve inside the bound before its
-			// contents are opened; escaping entries are silently skipped.
-			indexRelPath := utils.JoinPathAsUnix(path, relPath)
-			indexRelPath = filepath.ToSlash(indexRelPath)
-			if _, _, serr := idx.GetRealPathScoped(boundIndexPath, indexRelPath); serr != nil {
-				if fileInfo.IsDir() {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-
-			// Check access control for each file/folder during walk. Share
-			// downloads are checked as the share owner via permUser, so the
-			// owner's deny rules apply to share visitors as well.
-			indexPath := utils.IndexPathFromNormalized(indexRelPath, true)
-			if !state.AccessPermitted(idx.Path, indexPath, permUser) {
-				if fileInfo.IsDir() {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-
-			// Prepend base folder name unless flatten is true
-			if !flatten {
-				relPath = filepath.Join(baseName, relPath)
-				relPath = filepath.ToSlash(relPath)
-			}
-
-			if fileInfo.IsDir() {
-				if tarWriter != nil {
-					header, err := tar.FileInfoHeader(fileInfo, "")
-					if err != nil {
-						return err
-					}
-					header.Name = relPath + "/"
-					return tarWriter.WriteHeader(header)
-				}
-				if zipWriter != nil {
-					zh, err := zip.FileInfoHeader(fileInfo)
-					if err != nil {
-						return err
-					}
-					zh.Name = relPath + "/"
-					zh.Method = zip.Store
-					_, err = zipWriter.CreateHeader(zh)
-					return err
-				}
-				return nil
-			}
-			return addSingleFile(ctx, filePath, relPath, zipWriter, tarWriter)
-		})
+	if !info.IsDir() {
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		return visit(realPath, baseName, info)
 	}
-	// For a single file, use the base name as the archive path
-	return addSingleFile(ctx, realPath, baseName, zipWriter, tarWriter)
+
+	return filepath.WalkDir(realPath, func(filePath string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if filePath == realPath {
+			return nil
+		}
+		relPath, err := filepath.Rel(realPath, filePath)
+		if err != nil {
+			return err
+		}
+
+		childIndexPath := utils.JoinPathAsUnix(indexPath, filepath.ToSlash(relPath))
+		// Apply the share owner's rules before resolving the entry.
+		allowed := state.AccessPermitted(idx.Path, utils.IndexPathFromNormalized(childIndexPath, true), permUser)
+		if !allowed {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		resolved, _, err := idx.GetRealPathScoped(bound, childIndexPath)
+		if err != nil {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		info, err := os.Stat(resolved)
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() && !(entry.IsDir() && info.IsDir()) {
+			return nil
+		}
+		archivePath := filepath.ToSlash(filepath.Join(baseName, relPath))
+		return visit(resolved, archivePath, info)
+	})
+}
+
+func addFile(ctx context.Context, source, indexPath string, d *Context, tarWriter *tar.Writer, zipWriter *zip.Writer) error {
+	return walkArchiveEntries(ctx, source, indexPath, d, func(realPath, archivePath string, info fs.FileInfo) error {
+		if !info.IsDir() {
+			return addSingleFile(ctx, realPath, archivePath, zipWriter, tarWriter)
+		}
+		if tarWriter != nil {
+			header, err := tar.FileInfoHeader(info, "")
+			if err != nil {
+				return err
+			}
+			header.Name = archivePath + "/"
+			return tarWriter.WriteHeader(header)
+		}
+		header, err := zip.FileInfoHeader(info)
+		if err != nil {
+			return err
+		}
+		header.Name = archivePath + "/"
+		header.Method = zip.Store
+		_, err = zipWriter.CreateHeader(header)
+		return err
+	})
 }
 
 // addSingleFile writes one file into the given zip or tar writer.
@@ -601,7 +586,7 @@ func addSingleFile(ctx context.Context, realPath, archivePath string, zipWriter 
 		return err
 	}
 
-	if info.IsDir() {
+	if !info.Mode().IsRegular() {
 		return nil
 	}
 
@@ -652,7 +637,7 @@ func createZip(ctx context.Context, d *Context, source string, w io.Writer, file
 	zipWriter := zip.NewWriter(w)
 
 	for _, filepath := range filenames {
-		err := addFile(ctx, source, filepath, d, nil, zipWriter, false)
+		err := addFile(ctx, source, filepath, d, nil, zipWriter)
 		if err != nil {
 			return fmt.Errorf("add %s to ZIP: %w", filepath, err)
 		}
@@ -670,7 +655,7 @@ func createTarGz(ctx context.Context, d *Context, source string, w io.Writer, fi
 	tarWriter := tar.NewWriter(gzWriter)
 
 	for _, filepath := range filenames {
-		err := addFile(ctx, source, filepath, d, tarWriter, nil, false)
+		err := addFile(ctx, source, filepath, d, tarWriter, nil)
 		if err != nil {
 			return fmt.Errorf("add %s to TAR.GZ: %w", filepath, err)
 		}
@@ -702,7 +687,7 @@ func createTarGzWithLevel(ctx context.Context, d *Context, source string, w io.W
 	defer tarWriter.Close()
 
 	for _, filepath := range filenames {
-		err := addFile(ctx, source, filepath, d, tarWriter, nil, false)
+		err := addFile(ctx, source, filepath, d, tarWriter, nil)
 		if err != nil {
 			return fmt.Errorf("add %s to TAR.GZ: %w", filepath, err)
 		}
@@ -746,7 +731,7 @@ func BuildAndStreamArchive(w http.ResponseWriter, r *http.Request, d *Context, s
 		return http.StatusInternalServerError, err
 	}
 	if limitGiB > 0 {
-		estimatedSize, err := computeArchiveSize(source, fileList, d)
+		estimatedSize, err := computeArchiveSize(r.Context(), source, fileList, d)
 		if err != nil {
 			return ErrToStatus(err), err
 		}
@@ -1540,41 +1525,23 @@ func preflightTarGz(archivePath, destDir string, policy *extractAccessPolicy) er
 	return nil
 }
 
-// computeArchiveSize returns the combined size of the given paths, respecting access rules.
-// Paths denied by access are skipped (not counted).
-func computeArchiveSize(source string, fileList []string, d *Context) (int64, error) {
-	var estimatedSize int64
-	idx := indexing.GetIndex(source)
-	if idx == nil {
-		return 0, fmt.Errorf("source %s is not available", source)
-	}
-
-	permUser := accessCheckUsername(d)
-	for _, path := range fileList {
-		if !state.AccessPermitted(idx.Path, utils.IndexPathFromNormalized(path, true), permUser) {
-			continue
-		}
-		realPath, isDir, err := idx.GetRealPath(path)
+// computeArchiveSize counts only the regular files that will be put in the archive.
+func computeArchiveSize(ctx context.Context, source string, paths []string, d *Context) (int64, error) {
+	var size int64
+	for _, indexPath := range paths {
+		err := walkArchiveEntries(ctx, source, indexPath, d, func(_ string, _ string, info fs.FileInfo) error {
+			if info.Mode().IsRegular() {
+				if info.Size() > math.MaxInt64-size {
+					size = math.MaxInt64
+				} else {
+					size += info.Size()
+				}
+			}
+			return nil
+		})
 		if err != nil {
 			return 0, err
 		}
-		if !isDir {
-			info, err := os.Stat(realPath)
-			if err != nil {
-				return 0, err
-			}
-			estimatedSize += info.Size()
-			continue
-		}
-		info, ok := idx.GetReducedMetadata(realPath, isDir)
-		if !ok {
-			indexPath := idx.MakeIndexPath(realPath, isDir).String()
-			info, err = idx.GetFsInfo(indexPath, false, true)
-			if err != nil {
-				return 0, fmt.Errorf("failed to get file info for %s : %v", path, err)
-			}
-		}
-		estimatedSize += info.Size
 	}
-	return estimatedSize, nil
+	return size, nil
 }

@@ -352,7 +352,7 @@ export async function download(format, files, shareHash = "") {
   const url = window.origin + apiPath
 
   if (isMultiItemArchive) {
-    const response = await fetch(url, shareDownloadFetchInit('HEAD'))
+    const response = await fetch(url, shareDownloadFetchInit(shareHash, 'HEAD'))
     if (response.status === 413) {
       throw new Error(i18n.global.t('fileLoading.archiveDownloadTooLarge'))
     }
@@ -372,12 +372,12 @@ export async function download(format, files, shareHash = "") {
   }, 100)
 }
 
-function shareDownloadFetchInit(method = "GET", extraHeaders = {}) {
+function shareDownloadFetchInit(shareHash, method, extraHeaders = {}) {
   return {
     method,
     credentials: "same-origin",
     headers: {
-      ...sharePublicAuthHeaders(state.shareInfo?.hash || ""),
+      ...(shareHash ? sharePublicAuthHeaders(shareHash) : {}),
       ...extraHeaders,
     },
   };
@@ -405,8 +405,8 @@ function totalFromContentRange(headerVal) {
   return Number.isFinite(n) ? n : 0
 }
 
-async function resolveDownloadContentLength(url) {
-  let res = await fetch(url, shareDownloadFetchInit('HEAD'))
+async function resolveDownloadContentLength(url, shareHash) {
+  let res = await fetch(url, shareDownloadFetchInit(shareHash, 'HEAD'))
   if (res.ok) {
     const cl = res.headers.get('Content-Length')
     if (cl) {
@@ -416,7 +416,7 @@ async function resolveDownloadContentLength(url) {
       }
     }
   }
-  res = await fetch(url, shareDownloadFetchInit('GET', { Range: 'bytes=0-0' }))
+  res = await fetch(url, shareDownloadFetchInit(shareHash, 'GET', { Range: 'bytes=0-0' }))
   const cancelBody = () => {
     if (res.body && typeof res.body.cancel === 'function') {
       res.body.cancel().catch(() => {})
@@ -457,7 +457,8 @@ async function chunkedRangeDownloadToBlob(
   fileSize,
   chunkSize,
   downloadId,
-  abortController
+  abortController,
+  shareHash
 ) {
   const chunks = []
   let offset = 0
@@ -478,7 +479,7 @@ async function chunkedRangeDownloadToBlob(
     const rangeHeader = `bytes=${offset}-${end}`
 
     const response = await fetch(baseUrl, {
-      ...shareDownloadFetchInit('GET', { Range: rangeHeader }),
+      ...shareDownloadFetchInit(shareHash, 'GET', { Range: rangeHeader }),
       signal: abortController.signal,
     })
 
@@ -617,7 +618,7 @@ async function downloadChunked(file, shareHash = "") {
   // Probe failures happen before a download entry exists, so report them here. Callers may
   // suppress the error they rethrow (silentChunkedError), which would otherwise hide it.
   try {
-    const serverLen = await resolveDownloadContentLength(baseUrl)
+    const serverLen = await resolveDownloadContentLength(baseUrl, shareHash)
     if (Number.isFinite(serverLen) && serverLen > 0) {
       fileSize = serverLen
     }
@@ -655,7 +656,8 @@ async function downloadChunked(file, shareHash = "") {
       fileSize,
       chunkSize,
       downloadId,
-      abortController
+      abortController,
+      shareHash
     )
     if (!blob) {
       return

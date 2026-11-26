@@ -5,7 +5,9 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"io/fs"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -21,7 +23,9 @@ import (
 	"github.com/gtsteffaniak/filebrowser/backend/internal/state"
 	"github.com/gtsteffaniak/filebrowser/backend/internal/utils"
 	"github.com/gtsteffaniak/filebrowser/backend/pkg/indexing"
+	"github.com/gtsteffaniak/filebrowser/backend/pkg/indexing/iteminfo"
 	"github.com/gtsteffaniak/filebrowser/backend/pkg/settings"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func setupShareArchiveDownloadTest(t *testing.T) (sourceRoot string, sourceName string, owner *users.User) {
@@ -164,7 +168,7 @@ func TestComputeArchiveSizePublicShareUsesShareOwner(t *testing.T) {
 			},
 		},
 	}
-	sizeBroken, err := computeArchiveSize(sourceName, []string{"/shared"}, dBroken)
+	sizeBroken, err := computeArchiveSize(t.Context(), sourceName, []string{"/shared"}, dBroken)
 	if err != nil {
 		t.Fatalf("computeArchiveSize: %v", err)
 	}
@@ -221,15 +225,101 @@ func TestArchiveDownloadLimitRejectsLargeArchiveBeforeStreaming(t *testing.T) {
 	if err := state.SaveArchiveDownloadLimit(1); err != nil {
 		t.Fatal(err)
 	}
-
 	d := shareArchiveContext(owner, "/shared")
 	for _, method := range []string{http.MethodHead, http.MethodGet} {
 		req := httptest.NewRequest(method, "/?algo=zip", nil)
 		rec := httptest.NewRecorder()
-		status, err := BuildAndStreamArchive(rec, req, d, sourceName, []string{"/shared/large.txt"})
+		status, err := BuildAndStreamArchive(rec, req, d, sourceName, []string{"/shared"})
 		if status != http.StatusRequestEntityTooLarge || err == nil || rec.Body.Len() != 0 {
 			t.Fatalf("%s: status=%d err=%v body bytes=%d", method, status, err, rec.Body.Len())
 		}
+	}
+
+	if err := state.DenyUser(root, utils.IndexPathFromNormalized("/shared/large.txt", false), owner.Username); err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/?algo=zip", nil)
+	status, err := BuildAndStreamArchive(rec, req, d, sourceName, []string{"/shared"})
+	if status != http.StatusOK || err != nil {
+		t.Fatalf("denied file must not count toward the limit: status=%d err=%v", status, err)
+	}
+	if entries := readZipFileNames(rec.Body.Bytes()); len(entries) != 1 || entries[0] != "shared/hello.txt" {
+		t.Fatalf("expected only accessible archive entries, got %v", entries)
+	}
+}
+
+func TestProtectedArchiveDownloadOverHTTP(t *testing.T) {
+	root, sourceName, owner := setupShareArchiveDownloadTest(t)
+	settings.Config.Server.MaxArchiveSizeGB = 0
+	settings.Config.Auth.Key = "archive-download-test-key"
+	owner.BackendScopes = []users.BackendScope{{Path: root, Scope: "/"}}
+	if err := state.UpdateUser(owner, "", "backendScopes"); err != nil {
+		t.Fatal(err)
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte("secret"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	link := &share.Share{
+		ShareSettings: share.ShareSettings{ShareLimits: share.ShareLimits{
+			SourceName: sourceName, DownloadsLimit: 1,
+		}},
+		ShareColumns: share.ShareColumns{Hash: "protected_archive_test", Path: "/shared"},
+		SourcePath:   root, UserID: owner.ID, PasswordHash: string(hash),
+	}
+	if err := state.CreateShare(link); err != nil {
+		t.Fatal(err)
+	}
+
+	original := FileInfoFasterFunc
+	FileInfoFasterFunc = func(utils.FileOptions, *users.User) (*iteminfo.ExtendedFileInfo, error) {
+		return nil, fs.ErrNotExist
+	}
+	t.Cleanup(func() { FileInfoFasterFunc = original })
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /public/api/resources/download", withHashFile(publicDownloadHandler))
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	client := server.Client()
+	client.Jar, err = cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	address := server.URL + "/public/api/resources/download?hash=" + link.Hash + "&file=%2F&algo=zip"
+	request := func(method, password string) (int, []byte) {
+		req, err := http.NewRequestWithContext(t.Context(), method, address, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if password != "" {
+			req.Header.Set("X-SHARE-PASSWORD", password)
+		}
+		res, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res.StatusCode, body
+	}
+
+	if status, _ := request(http.MethodGet, ""); status != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated download returned %d", status)
+	}
+	if status, body := request(http.MethodHead, "secret"); status != http.StatusOK || len(body) != 0 {
+		t.Fatalf("archive preflight returned %d with %d body bytes", status, len(body))
+	}
+	if status, body := request(http.MethodGet, ""); status != http.StatusOK || len(readZipFileNames(body)) != 1 {
+		t.Fatalf("archive download using session cookie returned %d", status)
+	}
+	if status, _ := request(http.MethodGet, ""); status != http.StatusForbidden {
+		t.Fatalf("download allowance should be used by GET only, got %d", status)
 	}
 }
 
