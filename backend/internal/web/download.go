@@ -188,7 +188,7 @@ func publicDownloadHandler(w http.ResponseWriter, r *http.Request, d *Context) (
 		return status, fmt.Errorf("error processing filelist: %v", files)
 	}
 	// Audit row is written inside RawFilesHandler via activity.RecordDownload.
-	if downloadResponseRecordsActivity(status, err) {
+	if r.Method == http.MethodGet && downloadResponseRecordsActivity(status, err) {
 		if recErr := state.IncrementShareDownloadCount(d.Share.Hash, d.User.Username); recErr != nil {
 			logger.Errorf("public share handler: failed to increment share download count for %s: %v", d.Share.Hash, recErr)
 		}
@@ -339,7 +339,7 @@ func RawFilesHandler(w http.ResponseWriter, r *http.Request, d *Context, source 
 			return http.StatusForbidden, err
 		}
 		status, err = ServeSingleFile(w, r, d, source, firstFilePath, fileName, ServeSingleFileOptions{ForceInline: forceInline})
-		if downloadResponseRecordsActivity(status, err) {
+		if r.Method == http.MethodGet && downloadResponseRecordsActivity(status, err) {
 			activity.RecordDownload(r, toActor(d), source, displayFileList)
 		}
 		return status, err
@@ -349,7 +349,7 @@ func RawFilesHandler(w http.ResponseWriter, r *http.Request, d *Context, source 
 	if status == 0 && err == nil {
 		status = http.StatusOK
 	}
-	if downloadResponseRecordsActivity(status, err) {
+	if r.Method == http.MethodGet && downloadResponseRecordsActivity(status, err) {
 		activity.RecordDownload(r, toActor(d), source, displayFileList)
 	}
 	return status, err

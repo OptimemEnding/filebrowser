@@ -171,16 +171,7 @@ async function retryDownload(id: number) {
   // Re-trigger download by calling the download function again
   downloadManager.remove(id);
   try {
-    if (
-      download.archiveFormat !== null &&
-      download.archiveFormat !== undefined &&
-      Array.isArray(download.archiveFiles) &&
-      download.archiveFiles.length > 0
-    ) {
-      await resourcesApi.download(download.archiveFormat, download.archiveFiles, download.shareHash || "");
-    } else {
-      await resourcesApi.download(null, [download.file], download.shareHash);
-    }
+    await resourcesApi.download(null, [download.file], download.shareHash);
   } catch (err) {
     console.error("Retry download failed:", err);
   }

@@ -79,7 +79,7 @@ type Server struct {
 	CacheDir                     string         `json:"cacheDir"`          // path to the cache directory, used for thumbnails and other cached files
 	CacheDirCleanup              bool           `json:"cacheDirCleanup"`   // whether to automatically cleanup the cache directory. Note: docker must also mount a persistent volume to persist the cache (default: false)
 	CacheDirMaxSizeMB            int64          `json:"cacheDirMaxSizeMB"` // maximum size in MB of the preview cache (cacheDir/diskcache). Past it, the least recently used files are deleted. 0 means no limit (default: 0)
-	MaxArchiveSizeGB             int64          `json:"maxArchiveSize"`    // maximum archive/unarchive size in GB. 0 means no limit. (default: 20)
+	MaxArchiveSizeGB             int64          `json:"maxArchiveSize"`    // maximum archive creation/extraction size and fallback download limit in GiB. 0 means no limit. (default: 0)
 	Filesystem                   Filesystem     `json:"filesystem"`        // filesystem settings
 	IndexSqlConfig               IndexSqlConfig `json:"indexSqlConfig"`    // Index database SQL configuration
 	// not exposed to config

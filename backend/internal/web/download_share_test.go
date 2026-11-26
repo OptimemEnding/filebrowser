@@ -3,6 +3,7 @@ package web
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -110,7 +111,7 @@ func TestCreateZipPublicShareUsesShareOwnerAccessRules(t *testing.T) {
 	d := shareArchiveContext(owner, "/shared")
 
 	var buf bytes.Buffer
-	if err := createZip(d, sourceName, &buf, "/shared"); err != nil {
+	if err := createZip(t.Context(), d, sourceName, &buf, "/shared"); err != nil {
 		t.Fatalf("createZip: %v", err)
 	}
 	names := readZipFileNames(buf.Bytes())
@@ -141,7 +142,7 @@ func TestCreateZipPublicShareUsesShareOwnerAccessRules(t *testing.T) {
 		},
 	}
 	var emptyBuf bytes.Buffer
-	if err := createZip(dBroken, sourceName, &emptyBuf, "/shared"); err != nil {
+	if err := createZip(t.Context(), dBroken, sourceName, &emptyBuf, "/shared"); err != nil {
 		t.Fatalf("createZip: %v", err)
 	}
 	if len(readZipFileNames(emptyBuf.Bytes())) != 0 {
@@ -172,30 +173,104 @@ func TestComputeArchiveSizePublicShareUsesShareOwner(t *testing.T) {
 	}
 }
 
-func TestBuildAndStreamArchivePublicShareHEADProducesArchive(t *testing.T) {
+func TestBuildAndStreamArchivePublicShareDoesNotSpool(t *testing.T) {
 	_, sourceName, owner := setupShareArchiveDownloadTest(t)
 	settings.Config.Server.CacheDir = t.TempDir()
-	if err := os.MkdirAll(settings.DownloadCacheDir(), 0o755); err != nil {
+	settings.Config.Server.MaxArchiveSizeGB = 0
+	d := shareArchiveContext(owner, "/shared")
+
+	for _, method := range []string{http.MethodHead, http.MethodGet} {
+		req := httptest.NewRequest(method, "/?algo=zip", nil)
+		req.Header.Set("Range", "bytes=0-0")
+		rec := httptest.NewRecorder()
+
+		status, err := BuildAndStreamArchive(rec, req, d, sourceName, []string{"/shared"})
+		if status != http.StatusOK || err != nil {
+			t.Fatalf("%s: status=%d err=%v", method, status, err)
+		}
+		if ranges := rec.Header().Get("Accept-Ranges"); ranges != "none" {
+			t.Fatalf("%s: unexpected Accept-Ranges %q", method, ranges)
+		}
+		if method == http.MethodHead {
+			if rec.Body.Len() != 0 || rec.Header().Get("Content-Length") != "" {
+				t.Fatal("HEAD should only return archive metadata")
+			}
+		} else if entries := readZipFileNames(rec.Body.Bytes()); len(entries) != 1 || entries[0] != "shared/hello.txt" {
+			t.Fatalf("GET must stream the full ZIP despite Range: %v", entries)
+		}
+	}
+	files, err := os.ReadDir(settings.Config.Server.CacheDir)
+	if err != nil || len(files) != 0 {
+		t.Fatalf("archive download left temporary files: %v, %v", files, err)
+	}
+}
+
+func TestArchiveDownloadLimitRejectsLargeArchiveBeforeStreaming(t *testing.T) {
+	root, sourceName, owner := setupShareArchiveDownloadTest(t)
+	file, err := os.Create(filepath.Join(root, "shared", "large.txt"))
+	if err != nil {
 		t.Fatal(err)
 	}
-	settings.Config.Server.MaxArchiveSizeGB = 0
+	if err := file.Truncate(1<<30 + 1); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.SaveArchiveDownloadLimit(1); err != nil {
+		t.Fatal(err)
+	}
 
 	d := shareArchiveContext(owner, "/shared")
-	req := httptest.NewRequest(http.MethodHead, "/?algo=zip", nil)
-	rec := httptest.NewRecorder()
+	for _, method := range []string{http.MethodHead, http.MethodGet} {
+		req := httptest.NewRequest(method, "/?algo=zip", nil)
+		rec := httptest.NewRecorder()
+		status, err := BuildAndStreamArchive(rec, req, d, sourceName, []string{"/shared/large.txt"})
+		if status != http.StatusRequestEntityTooLarge || err == nil || rec.Body.Len() != 0 {
+			t.Fatalf("%s: status=%d err=%v body bytes=%d", method, status, err, rec.Body.Len())
+		}
+	}
+}
 
-	status, err := BuildAndStreamArchive(rec, req, d, sourceName, []string{"/shared"})
-	if err != nil {
-		t.Fatalf("BuildAndStreamArchive HEAD: status=%d err=%v", status, err)
+type cancelOnArchiveWrite struct {
+	*httptest.ResponseRecorder
+	cancel context.CancelFunc
+}
+
+func (w *cancelOnArchiveWrite) Write(p []byte) (int, error) {
+	n, err := w.ResponseRecorder.Write(p)
+	w.cancel()
+	return n, err
+}
+
+func TestArchiveDownloadStopsOnCancellation(t *testing.T) {
+	root, sourceName, owner := setupShareArchiveDownloadTest(t)
+	settings.Config.Server.CacheDir = t.TempDir()
+	settings.Config.Server.MaxArchiveSizeGB = 0
+	content := make([]byte, 512<<10)
+	if err := os.WriteFile(filepath.Join(root, "shared", "hello.txt"), content, 0o644); err != nil {
+		t.Fatal(err)
 	}
-	cl := rec.Header().Get("Content-Length")
-	if cl == "" || cl == "0" {
-		t.Fatalf("expected non-zero Content-Length on HEAD archive, got %q", cl)
-	}
-	token := rec.Header().Get("X-Archive-Token")
-	if token == "" {
-		t.Fatal("expected X-Archive-Token for chunked archive session")
-	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	d := shareArchiveContext(owner, "/shared")
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "/?algo=zip", nil)
+	w := &cancelOnArchiveWrite{ResponseRecorder: httptest.NewRecorder(), cancel: cancel}
+	defer func() {
+		if recovered := recover(); recovered != http.ErrAbortHandler {
+			t.Fatalf("expected canceled response to abort, got %v", recovered)
+		}
+		if !w.Flushed || w.Body.Len() == 0 || w.Body.Len() >= len(content) {
+			t.Fatalf("expected only partial archive data before cancellation, got %d bytes", w.Body.Len())
+		}
+		files, err := os.ReadDir(settings.Config.Server.CacheDir)
+		if err != nil || len(files) != 0 {
+			t.Fatalf("canceled archive download left temporary files: %v, %v", files, err)
+		}
+	}()
+	_, _ = BuildAndStreamArchive(w, req, d, sourceName, []string{"/shared"})
 }
 
 func TestRawFilesHandlerShareDirectoryDownloadNotEmptyZip(t *testing.T) {

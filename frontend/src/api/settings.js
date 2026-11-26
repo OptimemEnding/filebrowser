@@ -25,6 +25,18 @@ export function config(showFull = false, showComments = false) {
   return fetchURL(path);
 }
 
+export function getArchiveDownloadSettings() {
+  return fetchJSON(getApiPath("settings/archive-download"));
+}
+
+export function saveArchiveDownloadSettings(maxSizeGiB) {
+  return fetchJSON(getApiPath("settings/archive-download"), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ maxSizeGiB }),
+  });
+}
+
 export async function sources() {
   try {
     const apiPath = getApiPath('settings/sources')

@@ -1,3 +1,4 @@
+import i18n from "@/i18n/index.ts"
 import { notify } from "@/notify/index.ts"
 import { getters, mutations, state } from "@/store/index.ts"
 import { globalVars } from "@/utils/constants.ts"
@@ -305,9 +306,6 @@ export async function download(format, files, shareHash = "") {
   const isMultiItemArchive =
     files.length > 1 || (files.length === 1 && isDirectoryItem(files[0]))
 
-  const useChunkedArchive =
-    downloadChunkSizeMb > 0 && isMultiItemArchive
-
   const useChunkedDownload =
     downloadChunkSizeMb > 0 &&
     files.length === 1 &&
@@ -353,8 +351,14 @@ export async function download(format, files, shareHash = "") {
   const apiPath = getApiPath("resources/download", params, false, shareHash !== "")
   const url = window.origin + apiPath
 
-  if (useChunkedArchive) {
-    return await downloadChunkedArchive(url, format, files, filePaths, source, shareHash)
+  if (isMultiItemArchive) {
+    const response = await fetch(url, shareDownloadFetchInit('HEAD'))
+    if (response.status === 413) {
+      throw new Error(i18n.global.t('fileLoading.archiveDownloadTooLarge'))
+    }
+    if (!response.ok) {
+      throw new Error(response.statusText || `HTTP ${response.status}`)
+    }
   }
 
   const link = document.createElement('a')
@@ -401,23 +405,14 @@ function totalFromContentRange(headerVal) {
   return Number.isFinite(n) ? n : 0
 }
 
-function appendArchiveTokenToUrl(url, token) {
-  if (!token) return url
-  const sep = url.includes('?') ? '&' : '?'
-  return `${url}${sep}archiveToken=${encodeURIComponent(token)}`
-}
-
-/** @returns {Promise<{ size: number, token: string | null }>} */
 async function resolveDownloadContentLength(url) {
-  let token = null
   let res = await fetch(url, shareDownloadFetchInit('HEAD'))
   if (res.ok) {
-    token = res.headers.get('X-Archive-Token')
     const cl = res.headers.get('Content-Length')
     if (cl) {
       const n = Number.parseInt(cl, 10)
       if (Number.isFinite(n) && n > 0) {
-        return { size: n, token }
+        return n
       }
     }
   }
@@ -428,12 +423,11 @@ async function resolveDownloadContentLength(url) {
     }
   }
   try {
-    token = res.headers.get('X-Archive-Token') || token
     if (res.status === 206) {
       const total = totalFromContentRange(res.headers.get('Content-Range'))
       if (total > 0) {
         cancelBody()
-        return { size: total, token }
+        return total
       }
     }
     if (res.ok) {
@@ -442,38 +436,16 @@ async function resolveDownloadContentLength(url) {
         const n = Number.parseInt(cl, 10)
         if (Number.isFinite(n) && n > 0) {
           cancelBody()
-          return { size: n, token }
+          return n
         }
       }
     }
     cancelBody()
-    return { size: 0, token }
+    return 0
   } catch (e) {
     cancelBody()
     throw e
   }
-}
-
-function archiveDisplayFileName(format, files) {
-  const ext = format === 'zip' ? '.zip' : '.tar.gz'
-  const first = files[0]
-  if (files.length === 1 && isDirectoryItem(first)) {
-    const base =
-      first.name ||
-      (first.path?.split('/').filter(Boolean).pop()) ||
-      'download'
-    return `${base}${ext}`
-  }
-  if (first?.path) {
-    const parts = first.path.split('/').filter(Boolean)
-    if (parts.length >= 2) {
-      return `${parts.at(-2)}${ext}`
-    }
-    if (parts.length === 1) {
-      return `${parts[0]}${ext}`
-    }
-  }
-  return `download${ext}`
 }
 
 /**
@@ -620,94 +592,6 @@ async function chunkedRangeDownloadToBlob(
   return new Blob(chunks, { type: 'application/octet-stream' })
 }
 
-async function downloadChunkedArchive(url, format, files, filePaths, source, shareHash) {
-  const downloadChunkSizeMb = state.user?.fileLoading?.downloadChunkSizeMb || 0
-  if (downloadChunkSizeMb === 0) {
-    throw new Error('Chunked download is disabled (chunk size is 0)')
-  }
-  const chunkSize = downloadChunkSizeMb * 1024 * 1024
-  const fileName = archiveDisplayFileName(format, files)
-  const sizeProbeMessage = 'Could not determine archive size for chunked download'
-  const { size: fileSize, token } = await resolveDownloadContentLength(url).catch((error) => {
-    notifyDownloadError(fileName, error?.message || sizeProbeMessage)
-    throw error
-  })
-  if (!fileSize || fileSize <= 0) {
-    notifyDownloadError(fileName, sizeProbeMessage)
-    throw new Error(sizeProbeMessage)
-  }
-
-  const baseUrl = appendArchiveTokenToUrl(url, token)
-
-  const stub = {
-    name: fileName,
-    path: filePaths[0],
-    source: source || '',
-    size: fileSize,
-    isDir: false,
-  }
-  const downloadId = downloadManager.add(stub, shareHash)
-  const dl = downloadManager.findById(downloadId)
-  if (dl) {
-    dl.archiveFormat = format
-    dl.archiveFiles = files
-  }
-
-  downloadManager.setStatus(downloadId, 'downloading')
-
-  const hasDownloadPrompt = state.prompts.some((h) => h.name === 'download')
-  if (!hasDownloadPrompt) {
-    mutations.showPrompt({ name: 'download' })
-  }
-
-  const abortController = new AbortController()
-  const dlm = downloadManager.findById(downloadId)
-  if (dlm) {
-    dlm.abortController = abortController
-  }
-
-  try {
-    const blob = await chunkedRangeDownloadToBlob(
-      baseUrl,
-      fileSize,
-      chunkSize,
-      downloadId,
-      abortController
-    )
-    if (!blob) {
-      return
-    }
-
-    const blobUrl = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = blobUrl
-    link.download = fileName
-    link.style.display = 'none'
-    document.body.appendChild(link)
-    link.click()
-
-    downloadManager.setStatus(downloadId, 'completed')
-    downloadManager.updateProgress(downloadId, fileSize, fileSize)
-    notifyDownloadComplete(fileName, fileSize)
-
-    setTimeout(() => {
-      document.body.removeChild(link)
-      URL.revokeObjectURL(blobUrl)
-    }, 100)
-  } catch (error) {
-    const downloadItem = downloadManager.findById(downloadId)
-    if (error.name === 'AbortError' || (downloadItem?.status === 'cancelled')) {
-      downloadManager.setStatus(downloadId, 'cancelled')
-      return
-    }
-    const message =
-      error instanceof Error ? error.message || 'Unknown error' : String(error)
-    downloadManager.setError(downloadId, message)
-    notifyDownloadError(fileName, message)
-    throw error
-  }
-}
-
 async function downloadChunked(file, shareHash = "") {
   const chunkSizeMb = state.user?.fileLoading?.downloadChunkSizeMb || 0
 
@@ -733,7 +617,7 @@ async function downloadChunked(file, shareHash = "") {
   // Probe failures happen before a download entry exists, so report them here. Callers may
   // suppress the error they rethrow (silentChunkedError), which would otherwise hide it.
   try {
-    const { size: serverLen } = await resolveDownloadContentLength(baseUrl)
+    const serverLen = await resolveDownloadContentLength(baseUrl)
     if (Number.isFinite(serverLen) && serverLen > 0) {
       fileSize = serverLen
     }

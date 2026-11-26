@@ -23,8 +23,6 @@ export interface DownloadItem {
   shareHash: string;
   chunks: unknown[];
   abortController: AbortController | null;
-  archiveFormat?: string | null;
-  archiveFiles?: DownloadFile[];
   errorDetails?: string;
 }
 

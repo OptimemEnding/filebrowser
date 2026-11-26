@@ -11,6 +11,20 @@
         :description="$t('settings.analyticsViewDescription')" @activate="openAnalyticsPrompt" />
       <SettingsButton class="item" :name="$t('settings.configViewerOpen')"
         :description="$t('settings.configViewerDescription')" @activate="openConfigViewerPrompt" />
+      <form class="item archive-download-setting" @submit.prevent="saveArchiveLimit">
+        <div>
+          <label for="archive-download-limit">{{ $t("fileLoading.archiveDownloadLimit") }}</label>
+          <p id="archive-download-limit-help">{{ $t("fileLoading.archiveDownloadLimitHelp") }}</p>
+        </div>
+        <div class="archive-download-controls">
+          <input id="archive-download-limit" v-model.number="archiveLimit" class="input"
+            type="number" min="0" step="1" required aria-describedby="archive-download-limit-help"
+            :disabled="savedArchiveLimit === null || savingArchiveLimit" />
+          <button class="button" type="submit" :disabled="!canSaveArchiveLimit">
+            {{ $t("general.save", { suffix: "" }) }}
+          </button>
+        </div>
+      </form>
       <ToggleSwitch class="item" v-model="media.alwaysUseOnlyOffice"
         :disabled="onlyOfficeDisabled"
         :value-tooltip="isLocked('alwaysUseOnlyOffice') ? $t('settings.lockedFromConfig') : ''"
@@ -26,7 +40,9 @@
 <script>
 import { notify } from "@/notify/index.ts";
 import { state, mutations } from "@/store/index.ts";
-import { getAnalytics, updateAnalytics, getMediaSettings } from "@/api/settings.js";
+import {
+  getAnalytics, updateAnalytics, getMediaSettings, getArchiveDownloadSettings, saveArchiveDownloadSettings,
+} from "@/api/settings.js";
 import { emptyMediaSettings, mergeMediaSettings, saveMediaSettingsPatch } from "@/utils/mediaSettings.js";
 import ToggleSwitch from "@/components/settings/ToggleSwitch.vue";
 import SettingsButton from "@/components/settings/SettingsButton.vue";
@@ -43,6 +59,9 @@ export default {
       analyticsEnabled: false,
       publishSupported: false,
       analyticsLoading: false,
+      archiveLimit: null,
+      savedArchiveLimit: null,
+      savingArchiveLimit: false,
       media: emptyMediaSettings(),
       /** Media settings pinned in the config file cannot be changed here. */
       lockedFromConfigPaths: [],
@@ -56,6 +75,13 @@ export default {
     };
   },
   computed: {
+    canSaveArchiveLimit() {
+      return this.savedArchiveLimit !== null &&
+        Number.isSafeInteger(this.archiveLimit) &&
+        this.archiveLimit >= 0 &&
+        this.archiveLimit !== this.savedArchiveLimit &&
+        !this.savingArchiveLimit;
+    },
     onlyOfficeDisabled() {
       return !this.mediaLoaded || this.savingOnlyOffice || this.isLocked("alwaysUseOnlyOffice");
     },
@@ -65,10 +91,32 @@ export default {
       disableUpdateNotifications: false,
       ...state.user,
     };
-    await this.loadAnalytics();
-    await this.loadMedia();
+    await Promise.all([this.loadAnalytics(), this.loadMedia(), this.loadArchiveLimit()]);
   },
   methods: {
+    async loadArchiveLimit() {
+      try {
+        const { maxSizeGiB } = await getArchiveDownloadSettings();
+        this.archiveLimit = maxSizeGiB;
+        this.savedArchiveLimit = maxSizeGiB;
+      } catch (error) {
+        notify.showError(error.message);
+      }
+    },
+    async saveArchiveLimit() {
+      if (!this.canSaveArchiveLimit) return;
+      this.savingArchiveLimit = true;
+      try {
+        const { maxSizeGiB } = await saveArchiveDownloadSettings(this.archiveLimit);
+        this.archiveLimit = maxSizeGiB;
+        this.savedArchiveLimit = maxSizeGiB;
+        notify.showSuccessToast(this.$t("settings.settingsUpdated"));
+      } catch (error) {
+        notify.showError(error.message);
+      } finally {
+        this.savingArchiveLimit = false;
+      }
+    },
     async loadMedia() {
       this.mediaLoadFailed = false;
       try {
@@ -183,5 +231,21 @@ export default {
 <style scoped>
 .card-content {
   margin-top: 1em;
+}
+
+.archive-download-setting,
+.archive-download-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75em;
+}
+
+.archive-download-setting {
+  justify-content: space-between;
+}
+
+.archive-download-controls .input {
+  width: 7em;
 }
 </style>
