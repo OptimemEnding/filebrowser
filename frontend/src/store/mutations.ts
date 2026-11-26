@@ -1,3 +1,4 @@
+import { downloadManager } from "@/utils/downloadManager.ts";
 import { setActiveViewGrantScope } from "@/api/viewToken.js";
 import { markRaw } from "vue";
 import { resourcesApi, usersApi } from "@/api/index.js";
@@ -617,6 +618,7 @@ export const mutations = {
     state.reload = value;
   },
   setCurrentUser: async (value: Partial<UserObject> | null) => {
+    if (value === null) downloadManager.reset();
     try {
       // If value is null or undefined, emit state change and exit early
       if (!value) {

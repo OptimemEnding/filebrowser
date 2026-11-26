@@ -1,6 +1,6 @@
 import { reactive } from "vue";
 
-export type DownloadStatus = "pending" | "downloading" | "completed" | "error" | "cancelled";
+export type DownloadStatus = "pending" | "preparing" | "downloading" | "completed" | "error" | "cancelled";
 
 export interface DownloadFile {
   name?: string;
@@ -23,6 +23,7 @@ export interface DownloadItem {
   shareHash: string;
   chunks: unknown[];
   abortController: AbortController | null;
+  archiveRequest?: { format: string; files: DownloadFile[] };
   errorDetails?: string;
 }
 
@@ -101,7 +102,7 @@ class DownloadManager {
     }
   }
 
-  /** Abort in-flight downloads, clear the queue, reset ids (fresh Download prompt instance). */
+  /** Abort in-flight downloads, clear the queue. */
   reset(): void {
     for (const item of this.queue) {
       if (item.abortController) {
@@ -113,11 +114,10 @@ class DownloadManager {
       }
     }
     this.queue.length = 0;
-    this.nextId = 0;
   }
 
   hasActive(): boolean {
-    return this.queue.some((item) => item.status === "downloading" || item.status === "pending");
+    return this.queue.some((item) => item.status === "downloading" || item.status === "pending" || item.status === "preparing");
   }
 }
 

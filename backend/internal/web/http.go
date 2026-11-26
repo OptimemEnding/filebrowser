@@ -237,6 +237,14 @@ func (w *ResponseWriterWrapper) Flush() {
 	}
 }
 
+func (w *ResponseWriterWrapper) FlushError() error {
+	return http.NewResponseController(w.ResponseWriter).Flush()
+}
+
+func (w *ResponseWriterWrapper) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
 // Hijack implements http.Hijacker so WebSocket upgrades (e.g. Vite HMR) work through LoggingMiddleware.
 func (w *ResponseWriterWrapper) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	if hijacker, ok := w.ResponseWriter.(http.Hijacker); ok {

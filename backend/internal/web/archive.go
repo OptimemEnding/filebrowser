@@ -700,15 +700,6 @@ func createTarGzWithLevel(ctx context.Context, d *Context, source string, w io.W
 
 // BuildAndStreamArchive writes each archive entry to the client as it is read.
 func BuildAndStreamArchive(w http.ResponseWriter, r *http.Request, d *Context, source string, fileList []string) (int, error) {
-	idx := indexing.GetIndex(source)
-	if idx == nil {
-		return http.StatusInternalServerError, fmt.Errorf("source %s is not available", source)
-	}
-	realPath, _, err := idx.GetRealPath(fileList[0])
-	if err != nil {
-		return realPathErrStatus(err), err
-	}
-
 	var extension string
 	switch r.URL.Query().Get("algo") {
 	case "zip", "true", "":
@@ -724,6 +715,43 @@ func BuildAndStreamArchive(w http.ResponseWriter, r *http.Request, d *Context, s
 	}
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		return http.StatusMethodNotAllowed, nil
+	}
+
+	var download *archiveDownload
+	transferStatus := "error"
+	if id := r.URL.Query().Get("archiveDownload"); r.Method == http.MethodGet && id != "" {
+		var ctx context.Context
+		var cancel context.CancelFunc
+		download, ctx, cancel = startArchiveDownload(r, d, id)
+		if download == nil {
+			return http.StatusGone, errors.New("archive download expired or already started")
+		}
+		r = r.WithContext(ctx)
+		controller := http.NewResponseController(w)
+		interrupted := make(chan struct{})
+		stop := context.AfterFunc(ctx, func() {
+			defer close(interrupted)
+			_ = controller.SetWriteDeadline(time.Now())
+		})
+		defer func() {
+			if !stop() {
+				<-interrupted
+			}
+			if ctx.Err() != nil {
+				transferStatus = "cancelled"
+			}
+			download.finish(transferStatus)
+			cancel()
+		}()
+	}
+
+	idx := indexing.GetIndex(source)
+	if idx == nil {
+		return http.StatusInternalServerError, fmt.Errorf("source %s is not available", source)
+	}
+	realPath, _, err := idx.GetRealPath(fileList[0])
+	if err != nil {
+		return realPathErrStatus(err), err
 	}
 
 	limitGiB, err := state.ArchiveDownloadLimit()
@@ -747,10 +775,10 @@ func BuildAndStreamArchive(w http.ResponseWriter, r *http.Request, d *Context, s
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.Header().Set("Accept-Ranges", "none")
 	if r.Method == http.MethodHead {
-		return http.StatusOK, nil
+		return prepareArchiveDownload(w, r, d)
 	}
 
-	stream := &archiveStreamWriter{writer: w}
+	stream := &archiveStreamWriter{writer: w, download: download}
 	var writer io.Writer = stream
 	if d.Share.MaxBandwidth > 0 {
 		limit := rate.Limit(d.Share.MaxBandwidth * 1024)
@@ -762,9 +790,17 @@ func BuildAndStreamArchive(w http.ResponseWriter, r *http.Request, d *Context, s
 	} else {
 		err = createTarGz(r.Context(), d, source, writer, fileList...)
 	}
+	if err == nil && download != nil {
+		err = http.NewResponseController(w).Flush()
+		if errors.Is(err, http.ErrNotSupported) {
+			err = nil
+		}
+	}
 	if err != nil {
 		if stream.started {
-			if !isClientDisconnect(r, err) {
+			if isClientDisconnect(r, err) {
+				transferStatus = "cancelled"
+			} else {
 				logger.Errorf("archive download interrupted: %v", err)
 			}
 			// Abort the response so a partial archive is not reported as a complete download.
@@ -773,18 +809,26 @@ func BuildAndStreamArchive(w http.ResponseWriter, r *http.Request, d *Context, s
 		w.Header().Del("Content-Disposition")
 		return ErrToStatus(err), err
 	}
+	transferStatus = "completed"
 	return http.StatusOK, nil
 }
 
 type archiveStreamWriter struct {
-	writer  http.ResponseWriter
-	started bool
+	writer   http.ResponseWriter
+	download *archiveDownload
+	started  bool
 }
 
 func (w *archiveStreamWriter) Write(p []byte) (int, error) {
 	n, err := w.writer.Write(p)
+	if w.download != nil {
+		w.download.bytes.Add(int64(n))
+	}
 	if !w.started {
 		w.started = true
+		if err == nil && w.download != nil {
+			w.download.transferring()
+		}
 		if err == nil {
 			if flusher, ok := w.writer.(http.Flusher); ok {
 				flusher.Flush()

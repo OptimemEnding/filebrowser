@@ -1,5 +1,5 @@
 <template>
-  <div v-if="!hasDownloads && currentPrompt && currentPrompt.confirm" class="card-content">
+  <div v-if="currentPrompt?.confirm" class="card-content">
     <p>{{ t("prompts.downloadMessage") }}</p>
 
     <button
@@ -17,7 +17,7 @@
   <div v-if="!hasDownloads && (!currentPrompt?.confirm)" class="card-content lonely-message">
     <span>{{ t("files.lonely") }}</span>
   </div>
-  <div v-if="hasDownloads" class="card-content">
+  <div v-if="hasDownloads && !currentPrompt?.confirm" class="card-content">
     <div ref="list" class="download-list">
       <div data-virtual-group="downloads" :style="virtual.group('downloads').style">
         <div
@@ -31,7 +31,12 @@
             <i class="material-symbols file-icon">insert_drive_file</i>
             <div class="file-info">
               <p class="file-name">{{ download.name }}</p>
-              <ProgressBar
+              <div v-if="download.archiveRequest" class="archive-progress" role="status">
+                <progress v-if="['pending', 'preparing', 'downloading'].includes(download.status)"
+                  :aria-label="download.name" />
+                <span>{{ archiveStatus(download) }}</span>
+              </div>
+              <ProgressBar v-else
                 :val="download.status === 'completed'
                   ? t('prompts.completed')
                   : download.status === 'error'
@@ -76,7 +81,7 @@
     <div v-if="hasDownloads" class="spacer"></div>
     <button
       type="button"
-      v-if="hasDownloads && hasClearable"
+      v-if="hasDownloads && hasClearable && !currentPrompt?.confirm"
       @click="downloadManager.clearCompleted()"
       class="button button--flat"
       :disabled="!hasClearable"
@@ -88,16 +93,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, useTemplateRef, watch } from "vue";
+import { computed, useTemplateRef, watch } from "vue";
 import { useI18n } from "@/i18n/index.ts";
-import { getters } from "@/store/index.ts";
+import { getters, state } from "@/store/index.ts";
 import { downloadManager } from "@/utils/downloadManager.ts";
 import type { DownloadItem } from "@/utils/downloadManager.ts";
 import { resourcesApi } from "@/api/index.js";
 import ProgressBar from "@/components/ProgressBar.vue";
+import { getHumanReadableFilesize } from "@/utils/filesizes.js";
 import { findScrollParents, useListingVirtualization } from "@/composables/useListingVirtualization.ts";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     promptId?: string | number | null;
   }>(),
@@ -117,7 +123,9 @@ const vFocus = {
 const formats = { zip: "zip", targz: "tar.gz" } as const;
 
 const list = useTemplateRef<HTMLElement>("list");
-const currentPrompt = computed(() => getters.currentPrompt());
+const currentPrompt = computed(() => props.promptId == null
+  ? getters.currentPrompt()
+  : state.prompts.find((prompt) => prompt.id === props.promptId));
 const downloads = computed(() => downloadManager.queue);
 const hasDownloads = computed(() => downloads.value.length > 0);
 const hasClearable = computed(() =>
@@ -146,16 +154,28 @@ watch(
   () => void virtual.refresh(),
 );
 
-onBeforeUnmount(() => {
-  downloadManager.reset();
-});
+function archiveStatus(download: DownloadItem): string {
+  switch (download.status) {
+    case "pending":
+    case "preparing":
+      return t("fileLoading.archiveDownloadPreparing");
+    case "cancelled":
+      return t("fileLoading.archiveDownloadCancelled");
+    case "completed":
+      return t("prompts.completed");
+    case "error":
+      return t("prompts.error");
+    default:
+      return t("fileLoading.archiveDownloadTransferred", { size: getHumanReadableFilesize(download.loaded) });
+  }
+}
 
 function formatDownloadError(download: DownloadItem): string {
   if (download.status !== "error") {
     return "";
   }
   const detail = download.errorDetails ? String(download.errorDetails) : t("prompts.error");
-  return t("prompts.downloadFailed", { message: detail });
+  return download.archiveRequest ? detail : t("prompts.downloadFailed", { message: detail });
 }
 
 function handleFormatSelect(format: string) {
@@ -171,7 +191,8 @@ async function retryDownload(id: number) {
   // Re-trigger download by calling the download function again
   downloadManager.remove(id);
   try {
-    await resourcesApi.download(null, [download.file], download.shareHash);
+    const archive = download.archiveRequest;
+    await resourcesApi.download(archive?.format ?? null, archive?.files ?? [download.file], download.shareHash);
   } catch (err) {
     console.error("Retry download failed:", err);
   }
@@ -190,6 +211,19 @@ async function retryDownload(id: number) {
 
 .download-item-wrapper {
   margin-bottom: 0.5rem;
+}
+
+.archive-progress {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  font-size: 0.875rem;
+}
+
+.archive-progress progress {
+  accent-color: var(--primaryColor);
+  width: 6em;
 }
 
 .download-item-wrapper.has-error {

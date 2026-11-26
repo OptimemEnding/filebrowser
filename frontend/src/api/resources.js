@@ -352,24 +352,115 @@ export async function download(format, files, shareHash = "") {
   const url = window.origin + apiPath
 
   if (isMultiItemArchive) {
-    const response = await fetch(url, shareDownloadFetchInit(shareHash, 'HEAD'))
+    return downloadArchive(url, format, files, shareHash)
+  }
+  startNativeDownload(url)
+}
+
+function startNativeDownload(url) {
+  const link = document.createElement('a')
+  link.href = url
+  link.style.display = 'none'
+  document.body.appendChild(link)
+  link.click()
+  setTimeout(() => link.remove(), 100)
+}
+
+async function downloadArchive(url, format, files, shareHash) {
+  const stem = files.length === 1
+    ? files[0].name || files[0].path?.split('/').filter(Boolean).at(-1)
+    : undefined
+  const name = `${stem || 'download'}.${format}`
+  const id = downloadManager.add({ name }, shareHash)
+  const item = downloadManager.findById(id)
+  const controller = new AbortController()
+  item.abortController = controller
+  item.archiveRequest = { format, files }
+  showDownloadPanel()
+
+  try {
+    const response = await fetch(url, {
+      ...shareDownloadFetchInit(shareHash, 'HEAD', { 'X-Track-Archive': '1' }),
+      cache: 'no-store',
+      signal: controller.signal,
+    })
     if (response.status === 413) {
       throw new Error(i18n.global.t('fileLoading.archiveDownloadTooLarge'))
     }
     if (!response.ok) {
       throw new Error(response.statusText || `HTTP ${response.status}`)
     }
+
+    const archiveId = response.headers.get('X-Archive-Download-ID')
+    if (!archiveId) {
+      throw new Error(i18n.global.t('fileLoading.archiveDownloadProgressUnavailable'))
+    }
+    const downloadURL = new URL(url)
+    downloadURL.searchParams.set('archiveDownload', archiveId)
+    const progressURL = getApiPath(
+      `resources/archive-download/${encodeURIComponent(archiveId)}`,
+      { hash: shareHash }, false, Boolean(shareHash),
+    )
+    const cancelArchive = () => {
+      void fetch(progressURL, {
+        ...shareDownloadFetchInit(shareHash, 'DELETE'),
+        keepalive: true,
+      }).catch(() => {})
+    }
+    if (controller.signal.aborted) {
+      cancelArchive()
+      return
+    }
+
+    controller.signal.addEventListener('abort', cancelArchive, { once: true })
+    try {
+      startNativeDownload(downloadURL.href)
+      const startDeadline = Date.now() + 30_000
+      while (!controller.signal.aborted) {
+        const progressResponse = await fetch(progressURL, {
+          ...shareDownloadFetchInit(shareHash, 'GET'),
+          cache: 'no-store',
+          signal: controller.signal,
+        })
+        if (!progressResponse.ok) {
+          throw new Error(i18n.global.t('fileLoading.archiveDownloadProgressUnavailable'))
+        }
+
+        const { status, bytes } = await progressResponse.json()
+        if (status === 'cancelled') {
+          downloadManager.setStatus(id, status)
+          return
+        }
+        if (status === 'error') {
+          throw new Error(i18n.global.t('fileLoading.archiveDownloadFailed'))
+        }
+        if (status === 'pending' && Date.now() > startDeadline) {
+          cancelArchive()
+          throw new Error(i18n.global.t('fileLoading.archiveDownloadDidNotStart'))
+        }
+        downloadManager.updateProgress(id, bytes, 0)
+        downloadManager.setStatus(id, status)
+        if (status === 'completed') {
+          return
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+      }
+    } finally {
+      controller.signal.removeEventListener('abort', cancelArchive)
+    }
+  } catch (error) {
+    if (!controller.signal.aborted) {
+      downloadManager.setError(id, error.message)
+    }
+  } finally {
+    item.abortController = null
   }
+}
 
-  const link = document.createElement('a')
-  link.href = url
-  link.style.display = 'none'
-  document.body.appendChild(link)
-  link.click()
-
-  setTimeout(() => {
-    document.body.removeChild(link)
-  }, 100)
+function showDownloadPanel() {
+  if (!state.prompts.some((prompt) => prompt.name === 'download' && !prompt.confirm)) {
+    mutations.showPrompt({ name: 'download' })
+  }
 }
 
 function shareDownloadFetchInit(shareHash, method, extraHeaders = {}) {
@@ -639,12 +730,7 @@ async function downloadChunked(file, shareHash = "") {
 
   downloadManager.setStatus(downloadId, "downloading")
 
-  // Show download prompt if not already shown (it should already be shown by downloadFiles, but check to be safe)
-  const hasDownloadPrompt = state.prompts.some(h => h.name === 'download');
-
-  if (!hasDownloadPrompt) {
-    mutations.showPrompt({ name: 'download' })
-  }
+  showDownloadPanel()
 
   const downloadItem = downloadManager.findById(downloadId)
   const abortController = new AbortController()

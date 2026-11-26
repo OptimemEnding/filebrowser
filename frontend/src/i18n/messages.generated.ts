@@ -855,6 +855,12 @@ export interface MessageParams {
   "fileLoading.archiveDownloadLimit": never;
   "fileLoading.archiveDownloadLimitHelp": never;
   "fileLoading.archiveDownloadTooLarge": never;
+  "fileLoading.archiveDownloadPreparing": never;
+  "fileLoading.archiveDownloadTransferred": "size";
+  "fileLoading.archiveDownloadCancelled": never;
+  "fileLoading.archiveDownloadFailed": never;
+  "fileLoading.archiveDownloadDidNotStart": never;
+  "fileLoading.archiveDownloadProgressUnavailable": never;
   "fileLoading.uploadStallTimeoutSeconds": never;
   "fileLoading.uploadStallTimeoutSecondsHelp": never;
   "fileLoading.clearAll": never;
