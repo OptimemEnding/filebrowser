@@ -73,14 +73,6 @@ func StartFilebrowser() {
 	if !dbExists {
 		database = fmt.Sprintf("Creating new database    : %v", settings.Config.Server.DatabaseV2.Path)
 	}
-	if !settings.Config.Server.DisableUpdateCheck {
-		info, _ := utils.CheckForUpdates()
-		if info.LatestVersion != "" {
-			logger.Infof("A new version is available: %s (current: %s)", info.LatestVersion, info.CurrentVersion)
-			logger.Infof("Release notes: %s", info.ReleaseNotes)
-		}
-		go utils.StartCheckForUpdates()
-	}
 
 	// Create context and channels for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())

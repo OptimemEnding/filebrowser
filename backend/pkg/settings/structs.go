@@ -68,18 +68,17 @@ type Environment struct {
 
 type Server struct {
 	SearchResultsLimit           int            `json:"searchResultsLimit" yaml:"searchResultsLimit" validate:"gte=1,lte=5000"` // maximum requested search results across all sources, hard max 5000 (default: 1000); quick search defaults to 100, advanced search to 500; size viewer remains limited to 200
-	MinSearchLength              int            `json:"minSearchLength" yaml:"minSearchLength"`                        // minimum length of search query to begin searching (default: 3)
-	DisableUpdateCheck           bool           `json:"disableUpdateCheck"`                                            // disables backend update check service
-	NumImageProcessors           int            `json:"numImageProcessors"`                                            // number of concurrent image processing jobs used to create previews, default is 4.
-	DisablePreviews              bool           `json:"disablePreviews"`                                               // disable all previews thumbnails, simple icons will be used
-	DisableResize                bool           `json:"disablePreviewResize"`                                          // disable resizing of previews for faster loading over slow connections
-	DisableTypeDetectionByHeader bool           `json:"disableTypeDetectionByHeader"`                                  // disable type detection by header, useful if filesystem is slow.
+	MinSearchLength              int            `json:"minSearchLength" yaml:"minSearchLength"`                                 // minimum length of search query to begin searching (default: 3)
+	NumImageProcessors           int            `json:"numImageProcessors"`                                                     // number of concurrent image processing jobs used to create previews, default is 4.
+	DisablePreviews              bool           `json:"disablePreviews"`                                                        // disable all previews thumbnails, simple icons will be used
+	DisableResize                bool           `json:"disablePreviewResize"`                                                   // disable resizing of previews for faster loading over slow connections
+	DisableTypeDetectionByHeader bool           `json:"disableTypeDetectionByHeader"`                                           // disable type detection by header, useful if filesystem is slow.
 	Logging                      []LogConfig    `json:"logging" yaml:"logging"`
 	Sources                      []*Source      `json:"sources" validate:"required,dive"`
 	CacheDir                     string         `json:"cacheDir"`          // path to the cache directory, used for thumbnails and other cached files
 	CacheDirCleanup              bool           `json:"cacheDirCleanup"`   // whether to automatically cleanup the cache directory. Note: docker must also mount a persistent volume to persist the cache (default: false)
 	CacheDirMaxSizeMB            int64          `json:"cacheDirMaxSizeMB"` // maximum size in MB of the preview cache (cacheDir/diskcache). Past it, the least recently used files are deleted. 0 means no limit (default: 0)
-	MaxArchiveSizeGB             int64          `json:"maxArchiveSize"`    // maximum archive creation/extraction size and fallback download limit in GiB. 0 means no limit. (default: 0)
+	MaxArchiveSizeGB             int64          `json:"maxArchiveSize"`    // fallback size limit in GiB for archive creation, extraction, and downloads. 0 means no limit. (default: 0)
 	Filesystem                   Filesystem     `json:"filesystem"`        // filesystem settings
 	IndexSqlConfig               IndexSqlConfig `json:"indexSqlConfig"`    // Index database SQL configuration
 	// not exposed to config
@@ -513,15 +512,14 @@ type UserDefaultsUI struct {
 
 // UserDefaultsAccount holds account/security settings
 type UserDefaultsAccount struct {
-	Permissions                UserDefaultsAccountPermissions `json:"permissions"`
-	LockPassword               bool                           `json:"lockPassword"`               // disable the user from changing their password
-	RequirePasswordChange      bool                           `json:"requirePasswordChange"`      // force password change at next password login
-	DisableSettings            bool                           `json:"disableSettings"`            // disable the user from viewing the settings page
-	LoginMethod                string                         `json:"loginMethod,omitempty"`      // login method to use: eg. password, proxy, oidc
-	DisableUpdateNotifications bool                           `json:"disableUpdateNotifications"` // disable update notifications banner for admin users
-	ShowAdvancedProfile        bool                           `json:"showAdvancedProfile"`        // show advanced profile settings in the user profile page
-	AllowCustomShareURL        *bool                          `json:"allowCustomShareURL"`        // allow users to choose custom share URLs (default: false)
-	MaxConcurrentTranscodes    int                            `json:"maxConcurrentTranscodes"`    // per-user concurrent transcode sessions (default: 1)
+	Permissions             UserDefaultsAccountPermissions `json:"permissions"`
+	LockPassword            bool                           `json:"lockPassword"`            // disable the user from changing their password
+	RequirePasswordChange   bool                           `json:"requirePasswordChange"`   // force password change at next password login
+	DisableSettings         bool                           `json:"disableSettings"`         // disable the user from viewing the settings page
+	LoginMethod             string                         `json:"loginMethod,omitempty"`   // login method to use: eg. password, proxy, oidc
+	ShowAdvancedProfile     bool                           `json:"showAdvancedProfile"`     // show advanced profile settings in the user profile page
+	AllowCustomShareURL     *bool                          `json:"allowCustomShareURL"`     // allow users to choose custom share URLs (default: false)
+	MaxConcurrentTranscodes int                            `json:"maxConcurrentTranscodes"` // per-user concurrent transcode sessions (default: 1)
 }
 
 // UserDefaults is a type that holds the default values for some fields on User.

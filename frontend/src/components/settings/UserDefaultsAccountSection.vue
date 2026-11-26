@@ -38,18 +38,6 @@
       <ToggleSwitch
         class="item"
         :enforceable="enforceable"
-        :enforced="!!enforced.disableUpdateNotifications"
-        :model-value="account.disableUpdateNotifications"
-        @update:model-value="(v) => emitAccountChange('disableUpdateNotifications', v)"
-        @update:enforced="(v) => emitEnforced('disableUpdateNotifications', v)"
-        :disabled="isFieldDisabled('disableUpdateNotifications')"
-        :value-tooltip="fieldDisabledTooltip('disableUpdateNotifications')"
-        :name="$t('profileSettings.disableUpdateNotifications')"
-        :description="$t('profileSettings.disableUpdateNotificationsDescription')"
-      />
-      <ToggleSwitch
-        class="item"
-        :enforceable="enforceable"
         :enforced="!!enforced.showAdvancedProfile"
         :model-value="account.showAdvancedProfile"
         @update:model-value="(v) => emitAccountChange('showAdvancedProfile', v)"

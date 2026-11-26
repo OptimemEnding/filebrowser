@@ -4,18 +4,6 @@
     :class="{ active: active, 'behind-overlay': behindOverlay, 'scrollable': isSettings }"
     :style="{ width: 'var(--sidebar-width)', translate: active ? 'none' : '-100%' }"
   >
-    <div v-if="shouldShow" class="button release-banner">
-      <a :href="releaseUrl">{{ $t("sidebar.updateIsAvailable") }}</a>
-      <i
-        @click="setSeenUpdate"
-        @keydown.enter.prevent="setSeenUpdate"
-        @keydown.space.prevent="setSeenUpdate"
-        role="button"
-        tabindex="0"
-        aria-label="close-banner"
-        class="material-symbols"
-      >close</i>
-    </div>
     <div v-if="showPwaInstall" class="button release-banner">
       <a @click="installPwa">{{ $t("pwa.install") }}</a>
       <i @click="dismissPwaInstall" role="button" tabindex="0" aria-label="close-banner" class="material-symbols">close</i>
@@ -76,7 +64,6 @@ export default {
   },
   mounted() {
     // Ensure the sidebar is initialized correctly
-    mutations.setSeenUpdate(localStorage.getItem("seenUpdate"));
     // Add keyboard event listener for Ctrl+B to toggle sidebar
     document.addEventListener('keydown', this.handleKeydown);
     document.addEventListener('mousemove', this.handleResize);
@@ -110,21 +97,12 @@ export default {
   computed: {
     externalLinks: () => globalVars.externalLinks,
     name: () => globalVars.name,
-    releaseUrl: () => globalVars.updateAvailable,
     isSettings: () => getters.isSettings(),
     isMobile: () => getters.isMobile(),
     active: () => getters.isSidebarVisible(),
     behindOverlay: () => state.isSearchActive || (state.prompts && state.prompts.length > 0),
     sidebarWidth: () => getters.sidebarWidth(),
     isResizing: () => state.sidebar.isResizing,
-    shouldShow() {
-      return (
-        globalVars.updateAvailable !== "" &&
-        state.user.permissions.admin &&
-        state.seenUpdate !== globalVars.updateAvailable &&
-        !state.user.disableUpdateNotifications
-      );
-    },
     showPwaInstall() {
       return installAvailable.value && !this.pwaInstallDismissed && !this.isSettings && !globalVars.disablePWAInstall;
     },
@@ -204,9 +182,6 @@ export default {
     // Show the help overlay
     help() {
       mutations.showPrompt("help");
-    },
-    setSeenUpdate() {
-      mutations.setSeenUpdate(globalVars.updateAvailable);
     },
     async installPwa() {
       const accepted = await promptInstall();

@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "A mozgás előnézet az animált felugró előnézet, amely ciklikusan végigmegy a videó vagy több kép képkockáján egy mappa esetében.",
     "popupPreview": "Pop-up nézegető",
     "popupPreviewDescription": "Egy felugró ablak jelenik meg a felhasználói felület felett, amikor a miniatűrökkel rendelkező elemek fölé mozgatja a gépet.",
-    "disableUpdateNotifications": "Értesítési frissítés megjelenítése letiltása",
-    "disableUpdateNotificationsDescription": "Az admin felhasználók számára az oldalsávon megjelenő frissítési értesítő banner kikapcsolása.",
     "accountOptions": "Fiókbeállítások",
     "showAdvancedProfile": "A profil speciális beállításainak megjelenítése",
     "showAdvancedProfileDescription": "Az egyszerűsített profilnézet helyett az oldalsávban jelenítse meg a kategóriák szerint csoportosított profilbeállításokat.",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "Választószöveg (üresen hagyva egy sor megjelenítéséhez)",
-    "updateIsAvailable": "Elérhető a frissítés!",
     "fileActions": "Fájl műveletek",
     "switchMode": "Váltás a linkek és a navigációs fa között",
     "customizeLinks": "Oldalsávos hivatkozások testreszabása",

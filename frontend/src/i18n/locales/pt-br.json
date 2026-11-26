@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "A visualização de movimento é a visualização pop-up animada que percorre os quadros do vídeo ou várias imagens de uma pasta",
     "popupPreview": "Visualizador de pop-up",
     "popupPreviewDescription": "Uma janela pop-up de sobreposição será exibida sobre a interface do usuário ao passar o mouse sobre itens com miniaturas",
-    "disableUpdateNotifications": "Desativar a exibição da notificação de atualização",
-    "disableUpdateNotificationsDescription": "Desative o banner de notificação de atualização que aparece para os usuários administradores na barra lateral.",
     "accountOptions": "Opções da conta",
     "showAdvancedProfile": "Mostrar configurações avançadas do perfil",
     "showAdvancedProfileDescription": "Mostrar as configurações do perfil categorizadas na barra lateral, em vez da visualização simplificada do perfil.",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "Texto do divisor (deixe em branco para mostrar uma linha)",
-    "updateIsAvailable": "Uma atualização está disponível!",
     "fileActions": "Ações de arquivo",
     "switchMode": "Alternar entre os links e a árvore de navegação",
     "customizeLinks": "Personalizar links da barra lateral",

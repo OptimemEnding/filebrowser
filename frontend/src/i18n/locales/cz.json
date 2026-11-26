@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "Animovaný náhled ve vyskakovacím okně, který postupně ukazuje snímky z videa nebo více obrázků ze složky.",
     "popupPreview": "Vyskakovací prohlížeč",
     "popupPreviewDescription": "Při najetí na položky s miniaturami se nad uživatelským rozhraním zobrazí překryvné vyskakovací okno.",
-    "disableUpdateNotifications": "Zakázat upozornění na aktualizace v postranním panelu",
-    "disableUpdateNotificationsDescription": "Zakázat banner s upozorněním na aktualizaci, který se zobrazuje uživatelům správce na postranním panelu.",
     "accountOptions": "Možnosti účtu",
     "showAdvancedProfile": "Zobrazit pokročilá nastavení profilu",
     "showAdvancedProfileDescription": "Zobrazit nastavení profilu rozdělená do kategorií v postranním panelu namísto zjednodušeného zobrazení profilu.",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "Text oddělovače (prázdné = jen čára)",
-    "updateIsAvailable": "Je dostupná aktualizace!",
     "fileActions": "Akce se soubory",
     "switchMode": "Přepínat mezi odkazy a navigačním stromem",
     "customizeLinks": "Upravit odkazy v postranním panelu",

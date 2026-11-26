@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "Podgląd ruchu to animowany podgląd wyskakujący, który cyklicznie przechodzi przez klatki wideo lub wiele obrazów dla folderu",
     "popupPreview": "Przeglądarka wyskakująca",
     "popupPreviewDescription": "Po najechaniu kursorem na elementy z miniaturami nad interfejsem użytkownika pojawi się wyskakujące okienko.",
-    "disableUpdateNotifications": "Wyłącz wyświetlanie aktualizacji powiadomień",
-    "disableUpdateNotificationsDescription": "Wyłącz baner powiadomień o aktualizacjach wyświetlany użytkownikom adminów na pasku bocznym.",
     "accountOptions": "Opcje konta",
     "showAdvancedProfile": "Pokaż zaawansowane ustawienia profilu",
     "showAdvancedProfileDescription": "Wyświetlaj ustawienia profilu pogrupowane według kategorii na pasku bocznym zamiast uproszczonego widoku profilu.",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "Tekst podziału (pozostaw pusty, aby wyświetlić linię)",
-    "updateIsAvailable": "Aktualizacja jest już dostępna!",
     "fileActions": "Działania na plikach",
     "switchMode": "Przełączanie między linkami a drzewem nawigacyjnym",
     "customizeLinks": "Dostosowywanie linków paska bocznego",

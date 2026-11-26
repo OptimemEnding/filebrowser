@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "モーションプレビューは、動画またはフォルダの複数の画像のフレームを循環するアニメーションポップアッププレビューです。",
     "popupPreview": "ポップアップ・ビューワ",
     "popupPreviewDescription": "サムネイル付きのアイテムにカーソルを合わせると、UIの上にオーバーレイ・ポップアップ・ウィンドウが表示されます。",
-    "disableUpdateNotifications": "アップデート通知を表示しない",
-    "disableUpdateNotificationsDescription": "サイドバーの管理者ユーザーに表示される更新通知バナーを無効にします。",
     "accountOptions": "アカウント設定",
     "showAdvancedProfile": "詳細なプロフィール設定を表示する",
     "showAdvancedProfileDescription": "簡易プロフィール表示の代わりに、サイドバーに分類されたプロフィール設定を表示します。",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "分割テキスト（行を表示するには空白にする）",
-    "updateIsAvailable": "アップデートが利用可能です！",
     "fileActions": "ファイル操作",
     "switchMode": "リンクとナビゲーションツリーを切り替える",
     "customizeLinks": "サイドバーリンクのカスタマイズ",

@@ -341,7 +341,6 @@ export default {
         lockPassword: false,
         requirePasswordChange: false,
         disableSettings: false,
-        disableUpdateNotifications: false,
         showAdvancedProfile: false,
         allowCustomShareURL: false,
         maxConcurrentTranscodes: 1,
@@ -372,7 +371,6 @@ export default {
         lockPassword: false,
         requirePasswordChange: false,
         disableSettings: false,
-        disableUpdateNotifications: false,
         showAdvancedProfile: false,
         allowCustomShareURL: false,
         maxConcurrentTranscodes: 1,
@@ -736,7 +734,6 @@ export default {
         user.lockPassword = !!account.lockPassword;
         user.requirePasswordChange = !!account.requirePasswordChange;
         user.disableSettings = !!account.disableSettings;
-        user.disableUpdateNotifications = !!account.disableUpdateNotifications;
         if (account.allowCustomShareURL !== undefined) {
           user.allowCustomShareURL = !!account.allowCustomShareURL;
         }
@@ -1022,7 +1019,6 @@ export default {
         lockPassword: !!this.user.lockPassword,
         requirePasswordChange: !!this.user.requirePasswordChange,
         disableSettings: !!this.user.disableSettings,
-        disableUpdateNotifications: !!this.user.disableUpdateNotifications,
         showAdvancedProfile: !!this.user.showAdvancedProfile,
         allowCustomShareURL: !!this.user.allowCustomShareURL,
         maxConcurrentTranscodes: Math.max(1, Number(this.user.maxConcurrentTranscodes) || 1),
@@ -1066,12 +1062,6 @@ export default {
       }
       if (current.disableSettings !== orig.disableSettings && !this.enforcedAccount.disableSettings) {
         fields.push("disableSettings");
-      }
-      if (
-        current.disableUpdateNotifications !== orig.disableUpdateNotifications
-        && !this.enforcedAccount.disableUpdateNotifications
-      ) {
-        fields.push("disableUpdateNotifications");
       }
       if (
         current.showAdvancedProfile !== orig.showAdvancedProfile
@@ -1127,7 +1117,6 @@ export default {
       this.editAccount.lockPassword = !!this.user.lockPassword;
       this.editAccount.requirePasswordChange = !!this.user.requirePasswordChange;
       this.editAccount.disableSettings = !!this.user.disableSettings;
-      this.editAccount.disableUpdateNotifications = !!this.user.disableUpdateNotifications;
       this.editAccount.showAdvancedProfile = !!this.user.showAdvancedProfile;
       this.editAccount.allowCustomShareURL = !!this.user.allowCustomShareURL;
       this.editAccount.maxConcurrentTranscodes = this.user.maxConcurrentTranscodes > 0
@@ -1144,7 +1133,6 @@ export default {
       this.user.lockPassword = this.editAccount.lockPassword;
       this.user.requirePasswordChange = this.editAccount.requirePasswordChange;
       this.user.disableSettings = this.editAccount.disableSettings;
-      this.user.disableUpdateNotifications = this.editAccount.disableUpdateNotifications;
       this.user.showAdvancedProfile = this.editAccount.showAdvancedProfile;
       this.user.allowCustomShareURL = this.editAccount.allowCustomShareURL;
       this.user.maxConcurrentTranscodes = Math.max(1, Number(this.editAccount.maxConcurrentTranscodes) || 1);

@@ -215,3 +215,27 @@ func TestConfigLoadWithoutServerMap(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigAcceptsRetiredUpdateSettings(t *testing.T) {
+	oldEnv, oldConfig := Env, Config
+	t.Cleanup(func() { Env, Config = oldEnv, oldConfig })
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	content := []byte(`server:
+  disableUpdateCheck: true
+  sources:
+    - path: "."
+userDefaults:
+  account:
+    disableUpdateNotifications: true
+    lockPassword: true
+`)
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := loadConfigWithDefaults(path, true); err != nil {
+		t.Fatal(err)
+	}
+	if !Config.UserDefaults.Account.LockPassword {
+		t.Fatal("expected the remaining account settings to load")
+	}
+}

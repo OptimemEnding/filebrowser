@@ -232,13 +232,6 @@ export const mutations = {
     }
     state.deletedItem = value;
   },
-  setSeenUpdate: (value: string | null) => {
-    if (value === state.seenUpdate) {
-      return;
-    }
-    state.seenUpdate = value
-    localStorage.setItem("seenUpdate", value ?? "");
-  },
   toggleOverflowMenu: () => {
     state.showOverflowMenu = !state.showOverflowMenu;
   },
@@ -960,7 +953,6 @@ export const mutations = {
         "hideFilesInTree",
         "showSelectMultiple",
         "debugOffice",
-        "disableUpdateNotifications",
         "newFileTemplate",
         "viewMode",
         "gallerySize",

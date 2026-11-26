@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "Previzualizarea mișcării este previzualizarea pop-up animată care trece prin cadrele video sau prin mai multe imagini pentru un dosar",
     "popupPreview": "Vizualizator pop-up",
     "popupPreviewDescription": "O fereastră pop-up suprapusă va fi afișată peste interfața de utilizator atunci când treceți peste elemente cu miniaturi",
-    "disableUpdateNotifications": "Dezactivați afișarea notificării de actualizare",
-    "disableUpdateNotificationsDescription": "Dezactivați bannerul de notificare a actualizărilor care apare pentru utilizatorii administratori în bara laterală.",
     "accountOptions": "Opțiuni de cont",
     "showAdvancedProfile": "Afișează setările avansate ale profilului",
     "showAdvancedProfileDescription": "Afișează setările de profil clasificate în bara laterală, în locul vizualizării simplificate a profilului.",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "Textul separatorului (lăsați gol pentru a afișa o linie)",
-    "updateIsAvailable": "O actualizare este disponibilă!",
     "fileActions": "Acțiuni de fișier",
     "switchMode": "Comutare între linkuri și arborele de navigare",
     "customizeLinks": "Personalizarea linkurilor din bara laterală",

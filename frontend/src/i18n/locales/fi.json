@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "Liikkuva esikatselu näyttää ponnahdusikkunassa vuorotellen videon ruutuja tai kansion kuvia.",
     "popupPreview": "Esikatselun ponnahdusikkuna",
     "popupPreviewDescription": "Näytä käyttöliittymän päällä esikatseluikkuna, kun viet osoittimen pikkukuvallisen kohteen päälle.",
-    "disableUpdateNotifications": "Piilota päivitysilmoitukset",
-    "disableUpdateNotificationsDescription": "Piilota ylläpitäjille sivupalkissa näytettävä päivitysilmoitus.",
     "accountOptions": "Tilin asetukset",
     "showAdvancedProfile": "Näytä profiilin lisäasetukset",
     "showAdvancedProfileDescription": "Näytä profiilin asetukset sivupalkissa ryhmiteltyinä yksinkertaistetun profiilinäkymän sijaan.",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "Erottimen teksti (jätä tyhjäksi, jos haluat pelkän viivan)",
-    "updateIsAvailable": "Päivitys on saatavilla.",
     "fileActions": "Tiedostotoiminnot",
     "switchMode": "Vaihda linkkien ja kansiopuun välillä",
     "customizeLinks": "Muokkaa sivupalkin linkkejä",

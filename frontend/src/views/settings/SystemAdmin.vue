@@ -1,9 +1,6 @@
 <template>
   <div class="card-content">
     <div class="settings-items">
-      <ToggleSwitch class="item" v-model="localuser.disableUpdateNotifications" @change="updateSettings"
-        :name="$t('profileSettings.disableUpdateNotifications')"
-        :description="$t('profileSettings.disableUpdateNotificationsDescription')" />
       <ToggleSwitch class="item" v-model="analyticsEnabled" :disabled="analyticsLoading || !publishSupported"
         @update:model-value="updateAnalytics" :name="$t('settings.analyticsEnabled')"
         :description="$t('settings.analyticsEnabledDescription')" />
@@ -11,16 +8,18 @@
         :description="$t('settings.analyticsViewDescription')" @activate="openAnalyticsPrompt" />
       <SettingsButton class="item" :name="$t('settings.configViewerOpen')"
         :description="$t('settings.configViewerDescription')" @activate="openConfigViewerPrompt" />
-      <form class="item archive-download-setting" @submit.prevent="saveArchiveLimit">
-        <div>
-          <label for="archive-download-limit">{{ $t("fileLoading.archiveDownloadLimit") }}</label>
-          <p id="archive-download-limit-help">{{ $t("fileLoading.archiveDownloadLimitHelp") }}</p>
+      <form class="archive-limit-form" @submit.prevent="saveArchiveLimits">
+        <div v-for="field in archiveLimitFields" :key="field.key" class="settings-number-input item archive-limit-setting">
+          <label :for="field.key">{{ $t(field.label) }}</label>
+          <div class="archive-limit-controls">
+            <input :id="field.key" v-model.number="archiveLimits[field.key]" class="input"
+              type="number" min="0" step="1" required
+              :disabled="savedArchiveLimits === null || savingArchiveLimits" />
+            <HelpTooltipIcon :text="$t(field.help)" :aria-label="$t('general.help')" />
+          </div>
         </div>
-        <div class="archive-download-controls">
-          <input id="archive-download-limit" v-model.number="archiveLimit" class="input"
-            type="number" min="0" step="1" required aria-describedby="archive-download-limit-help"
-            :disabled="savedArchiveLimit === null || savingArchiveLimit" />
-          <button class="button" type="submit" :disabled="!canSaveArchiveLimit">
+        <div class="card-actions">
+          <button class="button" type="submit" :disabled="!canSaveArchiveLimits">
             {{ $t("general.save", { suffix: "" }) }}
           </button>
         </div>
@@ -39,29 +38,37 @@
 
 <script>
 import { notify } from "@/notify/index.ts";
-import { state, mutations } from "@/store/index.ts";
+import { mutations } from "@/store/index.ts";
 import {
-  getAnalytics, updateAnalytics, getMediaSettings, getArchiveDownloadSettings, saveArchiveDownloadSettings,
+  getAnalytics, updateAnalytics, getMediaSettings, getArchiveSettings, saveArchiveSettings,
 } from "@/api/settings.js";
 import { emptyMediaSettings, mergeMediaSettings, saveMediaSettingsPatch } from "@/utils/mediaSettings.js";
 import ToggleSwitch from "@/components/settings/ToggleSwitch.vue";
 import SettingsButton from "@/components/settings/SettingsButton.vue";
+import HelpTooltipIcon from "@/components/HelpTooltipIcon.vue";
+
+const archiveLimitFields = [
+  { key: "downloadGiB", label: "fileLoading.archiveDownloadLimit", help: "fileLoading.archiveDownloadLimitHelp" },
+  { key: "createGiB", label: "fileLoading.archiveCreateLimit", help: "fileLoading.archiveCreateLimitHelp" },
+  { key: "extractGiB", label: "fileLoading.archiveExtractLimit", help: "fileLoading.archiveExtractLimitHelp" },
+];
 
 export default {
   name: "systemAdmin",
   components: {
     ToggleSwitch,
     SettingsButton,
+    HelpTooltipIcon,
   },
   data() {
     return {
-      localuser: { disableUpdateNotifications: false },
       analyticsEnabled: false,
       publishSupported: false,
       analyticsLoading: false,
-      archiveLimit: null,
-      savedArchiveLimit: null,
-      savingArchiveLimit: false,
+      archiveLimitFields,
+      archiveLimits: { downloadGiB: null, createGiB: null, extractGiB: null },
+      savedArchiveLimits: null,
+      savingArchiveLimits: false,
       media: emptyMediaSettings(),
       /** Media settings pinned in the config file cannot be changed here. */
       lockedFromConfigPaths: [],
@@ -75,46 +82,41 @@ export default {
     };
   },
   computed: {
-    canSaveArchiveLimit() {
-      return this.savedArchiveLimit !== null &&
-        Number.isSafeInteger(this.archiveLimit) &&
-        this.archiveLimit >= 0 &&
-        this.archiveLimit !== this.savedArchiveLimit &&
-        !this.savingArchiveLimit;
+    canSaveArchiveLimits() {
+      if (!this.savedArchiveLimits || this.savingArchiveLimits) return false;
+      const keys = archiveLimitFields.map(({ key }) => key);
+      return keys.every((key) => Number.isSafeInteger(this.archiveLimits[key]) && this.archiveLimits[key] >= 0)
+        && keys.some((key) => this.archiveLimits[key] !== this.savedArchiveLimits[key]);
     },
     onlyOfficeDisabled() {
       return !this.mediaLoaded || this.savingOnlyOffice || this.isLocked("alwaysUseOnlyOffice");
     },
   },
   async mounted() {
-    this.localuser = {
-      disableUpdateNotifications: false,
-      ...state.user,
-    };
-    await Promise.all([this.loadAnalytics(), this.loadMedia(), this.loadArchiveLimit()]);
+    await Promise.all([this.loadAnalytics(), this.loadMedia(), this.loadArchiveLimits()]);
   },
   methods: {
-    async loadArchiveLimit() {
+    async loadArchiveLimits() {
       try {
-        const { maxSizeGiB } = await getArchiveDownloadSettings();
-        this.archiveLimit = maxSizeGiB;
-        this.savedArchiveLimit = maxSizeGiB;
+        const limits = await getArchiveSettings();
+        this.archiveLimits = { ...limits };
+        this.savedArchiveLimits = limits;
       } catch (error) {
         notify.showError(error.message);
       }
     },
-    async saveArchiveLimit() {
-      if (!this.canSaveArchiveLimit) return;
-      this.savingArchiveLimit = true;
+    async saveArchiveLimits() {
+      if (!this.canSaveArchiveLimits) return;
+      this.savingArchiveLimits = true;
       try {
-        const { maxSizeGiB } = await saveArchiveDownloadSettings(this.archiveLimit);
-        this.archiveLimit = maxSizeGiB;
-        this.savedArchiveLimit = maxSizeGiB;
+        const limits = await saveArchiveSettings(this.archiveLimits);
+        this.archiveLimits = { ...limits };
+        this.savedArchiveLimits = limits;
         notify.showSuccessToast(this.$t("settings.settingsUpdated"));
       } catch (error) {
         notify.showError(error.message);
       } finally {
-        this.savingArchiveLimit = false;
+        this.savingArchiveLimits = false;
       }
     },
     async loadMedia() {
@@ -167,17 +169,6 @@ export default {
         notify.showError(e?.message || this.$t("media.updateFailed"));
       } finally {
         this.savingOnlyOffice = false;
-      }
-    },
-    async updateSettings(event) {
-      if (event && typeof event.preventDefault === "function") {
-        event.preventDefault();
-      }
-      try {
-        void mutations.updateCurrentUser(this.localuser);
-        notify.showSuccessToast(this.$t("settings.settingsUpdated"));
-      } catch (e) {
-        console.error(e);
       }
     },
     async loadAnalytics() {
@@ -233,19 +224,27 @@ export default {
   margin-top: 1em;
 }
 
-.archive-download-setting,
-.archive-download-controls {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+.archive-limit-form {
+  display: grid;
   gap: 0.75em;
 }
 
-.archive-download-setting {
+.archive-limit-setting,
+.archive-limit-controls {
+  display: flex;
+  gap: 0.75em;
+}
+
+.archive-limit-setting {
+  align-items: center;
   justify-content: space-between;
 }
 
-.archive-download-controls .input {
+.archive-limit-controls {
+  align-items: flex-start;
+}
+
+.archive-limit-controls .input {
   width: 7em;
 }
 </style>

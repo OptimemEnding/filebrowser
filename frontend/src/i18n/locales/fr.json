@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "L'aperçu animé est une fenêtre contextuelle animée qui fait défiler les images d'une vidéo, ou plusieurs images pour un dossier",
     "popupPreview": "Aperçu contextuel",
     "popupPreviewDescription": "Une fenêtre superposée s'affiche au-dessus de l'interface lorsque l'on survole des éléments ayant une vignette",
-    "disableUpdateNotifications": "Désactiver l'affichage des notifications de mise à jour",
-    "disableUpdateNotificationsDescription": "Désactiver la bannière de notification de mise à jour qui s'affiche dans la barre latérale pour les administrateurs.",
     "accountOptions": "Options du compte",
     "showAdvancedProfile": "Afficher les paramètres avancés du profil",
     "showAdvancedProfileDescription": "Afficher les paramètres de profil classés par catégorie dans la barre latérale, au lieu de l'affichage simplifié du profil.",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "Texte du séparateur (laisser vide pour afficher une ligne)",
-    "updateIsAvailable": "Une mise à jour est disponible !",
     "fileActions": "Actions sur les fichiers",
     "switchMode": "Basculer entre les liens et l'arborescence de navigation",
     "customizeLinks": "Personnaliser les liens de la barre latérale",

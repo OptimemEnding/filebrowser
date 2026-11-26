@@ -45,7 +45,7 @@ describe("archive download", () => {
       expect(params.get("archiveDownload")).toBe("tracked-id");
     });
 
-    await download("zip", [folder], "requested-share");
+    await download("zip", [folder], "requested-share", { directArchive: true });
 
     expect(mutations.showPrompt).toHaveBeenCalledWith({ name: "download" });
     expect(downloadManager.queue[0]).toMatchObject({ name: "backup.zip", status: "completed", loaded: 65536 });
@@ -56,6 +56,67 @@ describe("archive download", () => {
     });
     expect(fetchMock.mock.calls[1][0]).toContain("/public/api/resources/archive-download/tracked-id");
     expect(nativeDownload).toHaveBeenCalledTimes(1);
+  });
+
+  it("hands the archive to the browser only after the response Blob is complete", async () => {
+    const blob = new Blob(["archive body"]);
+    let finishBody;
+    const responseBlob = vi.fn(() => new Promise((resolve) => { finishBody = resolve; }));
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ...preflightOK,
+        headers: new Headers({
+          "X-Archive-Download-ID": "tracked-id",
+          "Content-Disposition": "attachment; filename*=UTF-8''saved%20archive.zip",
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ status: "completed", bytes: blob.size }) })
+      .mockResolvedValueOnce({ ok: true, blob: responseBlob });
+    vi.stubGlobal("fetch", fetchMock);
+    const objectURL = vi.fn().mockReturnValue("blob:test");
+    const revokeURL = vi.fn();
+    const BrowserURL = URL;
+    vi.stubGlobal("URL", class extends BrowserURL {
+      static createObjectURL = objectURL;
+      static revokeObjectURL = revokeURL;
+    });
+    const nativeDownload = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function () {
+      expect(this.href).toBe("blob:test");
+      expect(this.download).toBe("saved archive.zip");
+    });
+
+    const transfer = download("zip", [folder]);
+    await vi.waitFor(() => expect(responseBlob).toHaveBeenCalled());
+    expect(nativeDownload).not.toHaveBeenCalled();
+    expect(downloadManager.queue[0].status).not.toBe("completed");
+
+    finishBody(blob);
+    await transfer;
+
+    expect(fetchMock.mock.calls[2][0]).toContain("/resources/download?");
+    expect(fetchMock.mock.calls[2][0]).toContain("archiveDownload=tracked-id");
+    expect(objectURL).toHaveBeenCalledWith(blob);
+    expect(nativeDownload).toHaveBeenCalledTimes(1);
+    expect(downloadManager.queue[0]).toMatchObject({ status: "completed", loaded: blob.size });
+    await vi.waitFor(() => expect(revokeURL).toHaveBeenCalledWith("blob:test"));
+  });
+
+  it("offers direct download when browser staging fails", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(preflightOK)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ status: "completed", bytes: 1 }) })
+      .mockResolvedValueOnce({ ok: true, blob: async () => { throw new TypeError("storage exhausted"); } })
+      .mockResolvedValueOnce({ ok: true, status: 204 });
+    vi.stubGlobal("fetch", fetchMock);
+    const nativeDownload = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    await download("zip", [folder]);
+
+    expect(downloadManager.queue[0]).toMatchObject({
+      status: "error",
+      errorDetails: expect.stringContaining("downloading directly"),
+    });
+    expect(nativeDownload).not.toHaveBeenCalled();
   });
 
   it("shows an archive size rejection without starting the browser download", async () => {
@@ -86,7 +147,7 @@ describe("archive download", () => {
     vi.stubGlobal("fetch", fetchMock);
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
 
-    await download("tar.gz", [folder]);
+    await download("tar.gz", [folder], "", { directArchive: true });
 
     expect(fetchMock.mock.calls[2][0]).toBe("/api/resources/archive-download/tracked-id");
     expect(fetchMock.mock.calls[2][1]).toMatchObject({ method: "DELETE", keepalive: true });

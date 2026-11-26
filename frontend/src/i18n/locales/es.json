@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "Las 'miniaturas en movimiento' son la vista previa emergente la cual recorre los fotogramas del vídeo o varias imágenes de una carpeta",
     "popupPreview": "Miniaturas emergentes",
     "popupPreviewDescription": "Se mostrará una ventana emergente superpuesta al pasar el mouse por encima de los elementos con miniaturas.",
-    "disableUpdateNotifications": "Desactivar las notificaciones de actualización",
-    "disableUpdateNotificationsDescription": "Desactivar el banner de notificación de actualización que aparece para los usuarios administradores en el panel lateral.",
     "accountOptions": "Opciones de la cuenta",
     "showAdvancedProfile": "Mostrar opciones avanzadas del perfil",
     "showAdvancedProfileDescription": "Mostrar la configuración del perfil por categorías en la barra lateral, en lugar de la vista simplificada del perfil.",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "Separador visual (déjalo en blanco para mostrar una línea)",
-    "updateIsAvailable": "¡Actualización disponible!",
     "fileActions": "Acciones de archivo",
     "switchMode": "Alternar entre los enlaces y el árbol de navegación",
     "customizeLinks": "Personalizar accesos directos",

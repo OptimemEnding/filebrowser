@@ -89,7 +89,6 @@ type integrationsPayload struct {
 type featuresPayload struct {
 	DisablePreviews        bool `json:"disable_previews"`
 	DisableWebDAV          bool `json:"disable_webdav"`
-	DisableUpdateCheck     bool `json:"disable_update_check"`
 	ActivityLoggingEnabled bool `json:"activity_logging_enabled"`
 	TLSEnabled             bool `json:"tls_enabled"`
 	RateLimitDisabled      bool `json:"rate_limit_disabled"`
@@ -211,7 +210,6 @@ func collectPayload(versionLabel string) (snapshotPayload, error) {
 		Features: featuresPayload{
 			DisablePreviews:        settings.Config.Server.DisablePreviews,
 			DisableWebDAV:          settings.Config.Http.DisableWebDAV,
-			DisableUpdateCheck:     settings.Config.Server.DisableUpdateCheck,
 			ActivityLoggingEnabled: !settings.Config.Server.DatabaseV2.Activity.Disabled,
 			TLSEnabled:             strings.TrimSpace(settings.Config.Http.TLSCert) != "" && strings.TrimSpace(settings.Config.Http.TLSKey) != "",
 			RateLimitDisabled:      settings.Config.Http.DisableRateLimit,

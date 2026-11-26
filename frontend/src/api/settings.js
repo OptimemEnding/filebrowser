@@ -25,15 +25,15 @@ export function config(showFull = false, showComments = false) {
   return fetchURL(path);
 }
 
-export function getArchiveDownloadSettings() {
-  return fetchJSON(getApiPath("settings/archive-download"));
+export function getArchiveSettings() {
+  return fetchJSON(getApiPath("settings/archive"));
 }
 
-export function saveArchiveDownloadSettings(maxSizeGiB) {
-  return fetchJSON(getApiPath("settings/archive-download"), {
+export function saveArchiveSettings(limits) {
+  return fetchJSON(getApiPath("settings/archive"), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ maxSizeGiB }),
+    body: JSON.stringify(limits),
   });
 }
 

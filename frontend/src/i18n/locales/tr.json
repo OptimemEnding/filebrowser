@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "Hareket önizlemesi, bir klasör için video kareleri veya birden fazla görüntü arasında geçiş yapan animasyonlu açılır önizlemedir",
     "popupPreview": "Pop-up görüntüleyici",
     "popupPreviewDescription": "Küçük resimli öğelerin üzerine gelindiğinde kullanıcı arayüzünün üzerinde bir kaplama açılır penceresi gösterilir",
-    "disableUpdateNotifications": "Bildirim güncellemesini göstermeyi devre dışı bırak",
-    "disableUpdateNotificationsDescription": "Kenar çubuğunda yönetici kullanıcılar için gösterilen güncelleme bildirim başlığını devre dışı bırakın.",
     "accountOptions": "Hesap seçenekleri",
     "showAdvancedProfile": "Gelişmiş profil ayarlarını göster",
     "showAdvancedProfileDescription": "Basitleştirilmiş profil görünümü yerine, kenar çubuğunda kategorilere ayrılmış profil ayarlarını göster.",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "Ayırıcı metin (bir çizgi göstermek için boş bırakın)",
-    "updateIsAvailable": "Bir güncelleme mevcut!",
     "fileActions": "Dosya işlemleri",
     "switchMode": "Bağlantılar ile gezinme ağacı arasında geçiş yap",
     "customizeLinks": "Kenar Çubuğu Bağlantılarını Özelleştir",

@@ -307,7 +307,6 @@ func handleWithStaticData(w http.ResponseWriter, r *http.Request, d *requestCont
 		"ldapAvailable":          settings.Config.Auth.Methods.LdapAuth.Enabled,
 		"ffmpegAvailable":        settings.FFmpegEnabled(),
 		"docPreviewExtensions":   iteminfo.DocPreviewExtensionsForSPA(),
-		"updateAvailable":        utils.GetUpdateAvailableUrl(),
 		"disableNavButtons":      disableNavButtons,
 		"userSelectableThemes":   settings.Config.Frontend.Styling.CustomThemeOptions,
 		"eventBasedThemes":       !settings.Config.Frontend.Styling.DisableEventBasedThemes,

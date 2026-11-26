@@ -13,6 +13,10 @@
     >
       {{ ext }}
     </button>
+    <label class="archive-delivery-option">
+      <input v-model="directArchive" type="checkbox" />
+      {{ t("fileLoading.archiveDownloadDirect") }}
+    </label>
   </div>
   <div v-if="!hasDownloads && (!currentPrompt?.confirm)" class="card-content lonely-message">
     <span>{{ t("files.lonely") }}</span>
@@ -93,7 +97,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, useTemplateRef, watch } from "vue";
+import { computed, ref, useTemplateRef, watch } from "vue";
 import { useI18n } from "@/i18n/index.ts";
 import { getters, state } from "@/store/index.ts";
 import { downloadManager } from "@/utils/downloadManager.ts";
@@ -120,7 +124,8 @@ const vFocus = {
   },
 };
 
-const formats = { zip: "zip", targz: "tar.gz" } as const;
+const formats = { zip: "zip", "tar.gz": "tar.gz" } as const;
+const directArchive = ref(false);
 
 const list = useTemplateRef<HTMLElement>("list");
 const currentPrompt = computed(() => props.promptId == null
@@ -181,7 +186,7 @@ function formatDownloadError(download: DownloadItem): string {
 function handleFormatSelect(format: string) {
   const confirm = currentPrompt.value?.confirm;
   if (typeof confirm === "function") {
-    confirm(format);
+    confirm(format, directArchive.value);
   }
 }
 
@@ -192,7 +197,9 @@ async function retryDownload(id: number) {
   downloadManager.remove(id);
   try {
     const archive = download.archiveRequest;
-    await resourcesApi.download(archive?.format ?? null, archive?.files ?? [download.file], download.shareHash);
+    await resourcesApi.download(archive?.format ?? null, archive?.files ?? [download.file], download.shareHash, {
+      directArchive: archive?.directArchive,
+    });
   } catch (err) {
     console.error("Retry download failed:", err);
   }
@@ -211,6 +218,13 @@ async function retryDownload(id: number) {
 
 .download-item-wrapper {
   margin-bottom: 0.5rem;
+}
+
+.archive-delivery-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  margin-top: 1em;
 }
 
 .archive-progress {

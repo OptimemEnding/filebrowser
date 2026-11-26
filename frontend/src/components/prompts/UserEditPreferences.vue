@@ -65,7 +65,6 @@ export default {
         lockPassword: false,
         requirePasswordChange: false,
         disableSettings: false,
-        disableUpdateNotifications: false,
         showAdvancedProfile: false,
         permissions: {
           admin: false,
@@ -118,7 +117,6 @@ export default {
       this.editAccount.lockPassword = !!user.lockPassword;
       this.editAccount.requirePasswordChange = !!user.requirePasswordChange;
       this.editAccount.disableSettings = !!user.disableSettings;
-      this.editAccount.disableUpdateNotifications = !!user.disableUpdateNotifications;
       this.editAccount.showAdvancedProfile = !!user.showAdvancedProfile;
       this.editAccount.permissions = {
         admin: !!permissions.admin,
@@ -136,7 +134,6 @@ export default {
         lockPassword: this.editAccount.lockPassword,
         requirePasswordChange: this.editAccount.requirePasswordChange,
         disableSettings: this.editAccount.disableSettings,
-        disableUpdateNotifications: this.editAccount.disableUpdateNotifications,
         showAdvancedProfile: this.editAccount.showAdvancedProfile,
         permissions: {
           ...(this.session.user.permissions || {}),
@@ -150,7 +147,6 @@ export default {
         lockPassword: this.editAccount.lockPassword,
         requirePasswordChange: this.editAccount.requirePasswordChange,
         disableSettings: this.editAccount.disableSettings,
-        disableUpdateNotifications: this.editAccount.disableUpdateNotifications,
         showAdvancedProfile: this.editAccount.showAdvancedProfile,
         permissions: { ...this.editAccount.permissions },
       };

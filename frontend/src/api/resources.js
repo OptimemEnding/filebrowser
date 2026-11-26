@@ -299,7 +299,7 @@ export async function put(source, path, content = '') {
   return result
 }
 
-export async function download(format, files, shareHash = "") {
+export async function download(format, files, shareHash = "", { directArchive = false } = {}) {
   const downloadChunkSizeMb = state.user?.fileLoading?.downloadChunkSizeMb || 0
   const sizeThreshold = downloadChunkSizeMb * 1024 * 1024
 
@@ -352,21 +352,22 @@ export async function download(format, files, shareHash = "") {
   const url = window.origin + apiPath
 
   if (isMultiItemArchive) {
-    return downloadArchive(url, format, files, shareHash)
+    return downloadArchive(url, format, files, shareHash, directArchive)
   }
   startNativeDownload(url)
 }
 
-function startNativeDownload(url) {
+function startNativeDownload(url, filename) {
   const link = document.createElement('a')
   link.href = url
+  if (filename) link.download = filename
   link.style.display = 'none'
   document.body.appendChild(link)
   link.click()
   setTimeout(() => link.remove(), 100)
 }
 
-async function downloadArchive(url, format, files, shareHash) {
+async function downloadArchive(url, format, files, shareHash, directArchive) {
   const stem = files.length === 1
     ? files[0].name || files[0].path?.split('/').filter(Boolean).at(-1)
     : undefined
@@ -375,7 +376,7 @@ async function downloadArchive(url, format, files, shareHash) {
   const item = downloadManager.findById(id)
   const controller = new AbortController()
   item.abortController = controller
-  item.archiveRequest = { format, files }
+  item.archiveRequest = { format, files, directArchive }
   showDownloadPanel()
 
   try {
@@ -395,6 +396,15 @@ async function downloadArchive(url, format, files, shareHash) {
     if (!archiveId) {
       throw new Error(i18n.global.t('fileLoading.archiveDownloadProgressUnavailable'))
     }
+    const attachmentName = response.headers.get('Content-Disposition')
+      ?.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+    if (attachmentName) {
+      try {
+        item.name = decodeURIComponent(attachmentName)
+      } catch {
+        // Keep the name built from the selection.
+      }
+    }
     const downloadURL = new URL(url)
     downloadURL.searchParams.set('archiveDownload', archiveId)
     const progressURL = getApiPath(
@@ -413,48 +423,93 @@ async function downloadArchive(url, format, files, shareHash) {
     }
 
     controller.signal.addEventListener('abort', cancelArchive, { once: true })
+    let completed = false
     try {
-      startNativeDownload(downloadURL.href)
-      const startDeadline = Date.now() + 30_000
-      while (!controller.signal.aborted) {
-        const progressResponse = await fetch(progressURL, {
-          ...shareDownloadFetchInit(shareHash, 'GET'),
-          cache: 'no-store',
-          signal: controller.signal,
-        })
-        if (!progressResponse.ok) {
-          throw new Error(i18n.global.t('fileLoading.archiveDownloadProgressUnavailable'))
-        }
-
-        const { status, bytes } = await progressResponse.json()
-        if (status === 'cancelled') {
-          downloadManager.setStatus(id, status)
-          return
-        }
-        if (status === 'error') {
+      if (directArchive) {
+        startNativeDownload(downloadURL.href)
+      }
+      const [progress, blob] = await Promise.all([
+        waitForArchiveProgress(progressURL, shareHash, id, controller.signal),
+        directArchive ? null : receiveArchive(downloadURL.href, shareHash, controller.signal),
+      ])
+      if (controller.signal.aborted) return
+      if (progress.status === 'cancelled') {
+        downloadManager.setStatus(id, 'cancelled')
+        return
+      }
+      if (blob) {
+        if (blob.size !== progress.bytes) {
           throw new Error(i18n.global.t('fileLoading.archiveDownloadFailed'))
         }
-        if (status === 'pending' && Date.now() > startDeadline) {
-          cancelArchive()
-          throw new Error(i18n.global.t('fileLoading.archiveDownloadDidNotStart'))
+        const filename = item.name
+        const blobURL = URL.createObjectURL(blob)
+        try {
+          startNativeDownload(blobURL, filename)
+        } finally {
+          setTimeout(() => URL.revokeObjectURL(blobURL), 100)
         }
-        downloadManager.updateProgress(id, bytes, 0)
-        downloadManager.setStatus(id, status)
-        if (status === 'completed') {
-          return
-        }
-        await new Promise((resolve) => setTimeout(resolve, 1000))
       }
+      downloadManager.setStatus(id, 'completed')
+      completed = true
+    } catch (error) {
+      if (!controller.signal.aborted) downloadManager.setError(id, error.message)
     } finally {
+      if (!completed) controller.abort()
       controller.signal.removeEventListener('abort', cancelArchive)
     }
   } catch (error) {
-    if (!controller.signal.aborted) {
-      downloadManager.setError(id, error.message)
-    }
+    if (!controller.signal.aborted) downloadManager.setError(id, error.message)
   } finally {
     item.abortController = null
   }
+}
+
+async function receiveArchive(url, shareHash, signal) {
+  const response = await fetch(url, {
+    ...shareDownloadFetchInit(shareHash, 'GET'),
+    cache: 'no-store',
+    signal,
+  })
+  if (!response.ok) {
+    const message = await readDownloadErrorBody(response)
+    throw new Error(message || i18n.global.t('fileLoading.archiveDownloadFailed'))
+  }
+  try {
+    // Give the network response directly to the browser's Blob storage.
+    return await response.blob()
+  } catch (error) {
+    if (signal.aborted) throw error
+    throw new Error(i18n.global.t('fileLoading.archiveDownloadBufferFailed'), { cause: error })
+  }
+}
+
+async function waitForArchiveProgress(url, shareHash, id, signal) {
+  const startDeadline = Date.now() + 30_000
+  while (!signal.aborted) {
+    const response = await fetch(url, {
+      ...shareDownloadFetchInit(shareHash, 'GET'),
+      cache: 'no-store',
+      signal,
+    })
+    if (!response.ok) {
+      throw new Error(i18n.global.t('fileLoading.archiveDownloadProgressUnavailable'))
+    }
+
+    const progress = await response.json()
+    if (progress.status === 'error') {
+      throw new Error(i18n.global.t('fileLoading.archiveDownloadFailed'))
+    }
+    if (progress.status === 'pending' && Date.now() > startDeadline) {
+      throw new Error(i18n.global.t('fileLoading.archiveDownloadDidNotStart'))
+    }
+    downloadManager.updateProgress(id, progress.bytes, 0)
+    if (progress.status === 'completed' || progress.status === 'cancelled') {
+      return progress
+    }
+    downloadManager.setStatus(id, progress.status)
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+  }
+  signal.throwIfAborted()
 }
 
 function showDownloadPanel() {

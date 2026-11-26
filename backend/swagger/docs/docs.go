@@ -2397,7 +2397,7 @@ const docTemplate = `{
         },
         "/api/resources/archive": {
             "post": {
-                "description": "Creates a zip or tar.gz archive on the server from the given paths (files and/or directories). Server-side only; no archive bytes are returned. All items must be from the same source. Folders are walked recursively; access-denied paths are silently skipped. Requires create permission. Archive size is checked against server.maxArchiveSizeGB limit if configured.\n\n**Request body parameters:**\n- **fromSource** (string, required): Source name where the paths to archive live. Example: ` + "`" + `\"default\"` + "`" + `\n- **toSource** (string, optional): Source name where the archive file will be written. Defaults to fromSource if omitted. Example: ` + "`" + `\"backups\"` + "`" + `\n- **paths** (array of strings, required): Paths of files or directories to add to the archive (relative to fromSource). Directories are walked; access-denied entries are skipped. Example: ` + "`" + `[\"/docs/file.txt\", \"/photos\"]` + "`" + `\n- **destination** (string, required): Full path where the archive file will be created (on toSource). Must end with .zip or .tar.gz (or format is inferred). Example: ` + "`" + `\"/backups/my-archive.zip\"` + "`" + `\n- **format** (string, optional): Archive format. One of: ` + "`" + `\"zip\"` + "`" + `, ` + "`" + `\"tar.gz\"` + "`" + `. Default inferred from destination extension. Example: ` + "`" + `\"zip\"` + "`" + `\n- **compression** (integer, optional): Gzip compression level for tar.gz only (0–9). 0 = default. Ignored for zip. Example: ` + "`" + `6` + "`" + `\n- **deleteAfter** (boolean, optional): If true, delete source files/directories after successful creation. Requires delete permission. Example: ` + "`" + `true` + "`" + `",
+                "description": "Creates a zip or tar.gz archive on the server from the given paths (files and/or directories). Server-side only; no archive bytes are returned. All items must be from the same source. Folders are walked recursively; access-denied paths are silently skipped. Requires create permission. Archive size is checked against the relevant archive size limit if configured.\n\n**Request body parameters:**\n- **fromSource** (string, required): Source name where the paths to archive live. Example: ` + "`" + `\"default\"` + "`" + `\n- **toSource** (string, optional): Source name where the archive file will be written. Defaults to fromSource if omitted. Example: ` + "`" + `\"backups\"` + "`" + `\n- **paths** (array of strings, required): Paths of files or directories to add to the archive (relative to fromSource). Directories are walked; access-denied entries are skipped. Example: ` + "`" + `[\"/docs/file.txt\", \"/photos\"]` + "`" + `\n- **destination** (string, required): Full path where the archive file will be created (on toSource). Must end with .zip or .tar.gz (or format is inferred). Example: ` + "`" + `\"/backups/my-archive.zip\"` + "`" + `\n- **format** (string, optional): Archive format. One of: ` + "`" + `\"zip\"` + "`" + `, ` + "`" + `\"tar.gz\"` + "`" + `. Default inferred from destination extension. Example: ` + "`" + `\"zip\"` + "`" + `\n- **compression** (integer, optional): Gzip compression level for tar.gz only (0–9). 0 = default. Ignored for zip. Example: ` + "`" + `6` + "`" + `\n- **deleteAfter** (boolean, optional): If true, delete source files/directories after successful creation. Requires delete permission. Example: ` + "`" + `true` + "`" + `",
                 "consumes": [
                     "application/json"
                 ],
@@ -2457,7 +2457,7 @@ const docTemplate = `{
                         }
                     },
                     "413": {
-                        "description": "Request Entity Too Large (archive size exceeds maxArchiveSizeGB limit)",
+                        "description": "Request Entity Too Large (archive exceeds the configured size limit)",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -2948,7 +2948,7 @@ const docTemplate = `{
         },
         "/api/resources/unarchive": {
             "post": {
-                "description": "Extracts a zip or tar.gz archive on the server into the given destination directory. Server-side only; no extracted bytes are returned. Supports extracting to a different source via toSource. Requires create permission. Archive size is checked against server.maxArchiveSizeGB limit if configured.\n\n**Request body parameters:**\n- **fromSource** (string, required): Source name where the archive file lives. Example: ` + "`" + `\"default\"` + "`" + `\n- **toSource** (string, optional): Source name where contents will be extracted. Defaults to fromSource if omitted. Example: ` + "`" + `\"restored\"` + "`" + `\n- **path** (string, required): Path to the archive file (on fromSource). Must be .zip, .tar.gz, or .tgz. Example: ` + "`" + `\"/downloads/data.zip\"` + "`" + `\n- **destination** (string, required): Directory path (on toSource) to extract into. Example: ` + "`" + `\"/projects/imported\"` + "`" + `\n- **deleteAfter** (boolean, optional): If true, delete the archive file after successful extraction. Default: false. Example: ` + "`" + `true` + "`" + `\n- **filenameEncoding** (string, optional): Fallback ZIP filename encoding: utf-8, cp932, gb18030, big5, euc-kr, cp437, windows-1252. Unicode metadata takes precedence. Omit to use a suggestion; ambiguous encodings require a selection.\n- **preview** (boolean, optional): Return ZIP encoding candidates and sample filenames without extracting or deleting anything. Requires the same source/destination permissions as extraction.",
+                "description": "Extracts a zip or tar.gz archive on the server into the given destination directory. Server-side only; no extracted bytes are returned. Supports extracting to a different source via toSource. Requires create permission. Archive size is checked against the relevant archive size limit if configured.\n\n**Request body parameters:**\n- **fromSource** (string, required): Source name where the archive file lives. Example: ` + "`" + `\"default\"` + "`" + `\n- **toSource** (string, optional): Source name where contents will be extracted. Defaults to fromSource if omitted. Example: ` + "`" + `\"restored\"` + "`" + `\n- **path** (string, required): Path to the archive file (on fromSource). Must be .zip, .tar.gz, or .tgz. Example: ` + "`" + `\"/downloads/data.zip\"` + "`" + `\n- **destination** (string, required): Directory path (on toSource) to extract into. Example: ` + "`" + `\"/projects/imported\"` + "`" + `\n- **deleteAfter** (boolean, optional): If true, delete the archive file after successful extraction. Default: false. Example: ` + "`" + `true` + "`" + `\n- **filenameEncoding** (string, optional): Fallback ZIP filename encoding: utf-8, cp932, gb18030, big5, euc-kr, cp437, windows-1252. Unicode metadata takes precedence. Omit to use a suggestion; ambiguous encodings require a selection.\n- **preview** (boolean, optional): Return ZIP encoding candidates and sample filenames without extracting or deleting anything. Requires the same source/destination permissions as extraction.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3006,7 +3006,7 @@ const docTemplate = `{
                         }
                     },
                     "413": {
-                        "description": "Request Entity Too Large (archive size exceeds maxArchiveSizeGB limit)",
+                        "description": "Request Entity Too Large (archive exceeds the configured size limit)",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -7009,10 +7009,6 @@ const docTemplate = `{
                     "description": "disable type detection by header, useful if filesystem is slow.",
                     "type": "boolean"
                 },
-                "disableUpdateCheck": {
-                    "description": "disables backend update check service",
-                    "type": "boolean"
-                },
                 "filesystem": {
                     "description": "filesystem settings",
                     "allOf": [
@@ -7036,7 +7032,7 @@ const docTemplate = `{
                     }
                 },
                 "maxArchiveSize": {
-                    "description": "maximum archive/unarchive size in GB. 0 means no limit. (default: 20)",
+                    "description": "fallback archive size limit in GiB. 0 means no limit. (default: 0)",
                     "type": "integer"
                 },
                 "minSearchLength": {
@@ -7391,10 +7387,6 @@ const docTemplate = `{
                 },
                 "disableSettings": {
                     "description": "disable the user from viewing the settings page",
-                    "type": "boolean"
-                },
-                "disableUpdateNotifications": {
-                    "description": "disable update notifications banner for admin users",
                     "type": "boolean"
                 },
                 "lockPassword": {
@@ -8268,10 +8260,6 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "disableSettings": {
-                    "type": "boolean"
-                },
-                "disableUpdateNotifications": {
-                    "description": "disable update notifications",
                     "type": "boolean"
                 },
                 "disableViewingExt": {

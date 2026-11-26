@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "動態預覽會以動畫彈出視窗循環顯示影片影格，或顯示資料夾中的多張圖片。",
     "popupPreview": "彈出式檢視器",
     "popupPreviewDescription": "滑鼠停留在有縮圖的項目上時，會以覆蓋式彈出視窗顯示預覽。",
-    "disableUpdateNotifications": "停用更新通知",
-    "disableUpdateNotificationsDescription": "停用只顯示給管理員的側邊欄更新通知橫幅。",
     "accountOptions": "帳戶選項",
     "showAdvancedProfile": "顯示進階個人資料設定",
     "showAdvancedProfileDescription": "在側邊欄中顯示分類後的個人資料設定，而非簡化版個人資料檢視。",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "分隔線文字（留空則只顯示一條線）",
-    "updateIsAvailable": "有可用的更新！",
     "fileActions": "檔案動作",
     "switchMode": "在連結與導覽樹之間切換",
     "customizeLinks": "自訂側邊欄連結",

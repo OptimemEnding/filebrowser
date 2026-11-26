@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "Pohybový náhľad je animovaný vyskakovací náhľad, ktorý cyklicky prechádza snímkami videa alebo viacerých obrázkov pre priečinok.",
     "popupPreview": "Pop-up prehliadač",
     "popupPreviewDescription": "Prekryvné vyskakovacie okno sa zobrazí nad používateľským rozhraním pri prejdení nad položky s miniatúrami",
-    "disableUpdateNotifications": "Zakázať zobrazovanie aktualizácie oznámení",
-    "disableUpdateNotificationsDescription": "Zakázanie bannera s oznámením o aktualizácii, ktorý sa zobrazuje používateľom administrátora na bočnom paneli.",
     "accountOptions": "Možnosti účtu",
     "showAdvancedProfile": "Zobraziť pokročilé nastavenia profilu",
     "showAdvancedProfileDescription": "Zobraziť nastavenia profilu podľa kategórií v bočnom paneli namiesto zjednodušeného zobrazenia profilu.",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "Text oddeľovača (nechajte prázdny, aby sa zobrazil riadok)",
-    "updateIsAvailable": "K dispozícii je aktualizácia!",
     "fileActions": "Akcie so súbormi",
     "switchMode": "Prepínanie medzi odkazmi a navigačným stromom",
     "customizeLinks": "Prispôsobenie odkazov na bočnom paneli",

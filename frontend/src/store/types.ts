@@ -474,7 +474,6 @@ export interface StoreState {
     };
   } | null;
   shareInfo: ShareInfoObject;
-  seenUpdate?: string | null;
   sources: {
     current: string;
     count: number;

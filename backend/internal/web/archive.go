@@ -27,7 +27,6 @@ import (
 	"github.com/gtsteffaniak/filebrowser/backend/internal/state"
 	"github.com/gtsteffaniak/filebrowser/backend/internal/utils"
 	"github.com/gtsteffaniak/filebrowser/backend/pkg/indexing"
-	"github.com/gtsteffaniak/filebrowser/backend/pkg/settings"
 	"github.com/gtsteffaniak/go-logger/logger"
 	"golang.org/x/time/rate"
 )
@@ -63,7 +62,7 @@ func archiveAttachmentStem(fileList []string, realPath string) string {
 // POST /resources/archive — server-side only; does not return archive data.
 //
 // @Summary Create an archive on the server
-// @Description Creates a zip or tar.gz archive on the server from the given paths (files and/or directories). Server-side only; no archive bytes are returned. All items must be from the same source. Folders are walked recursively; access-denied paths are silently skipped. Requires create permission. Archive size is checked against server.maxArchiveSizeGB limit if configured.
+// @Description Creates a zip or tar.gz archive on the server from the given paths (files and/or directories). Server-side only; no archive bytes are returned. All items must be from the same source. Folders are walked recursively; access-denied paths are silently skipped. Requires create permission. Archive size is checked against the archive size limit if configured.
 // @Description
 // @Description **Request body parameters:**
 // @Description - **fromSource** (string, required): Source name where the paths to archive live. Example: `"default"`
@@ -81,7 +80,7 @@ func archiveAttachmentStem(fileList []string, realPath string) string {
 // @Failure 400 {object} map[string]string "Invalid request (e.g. missing required field, invalid path)"
 // @Failure 403 {object} map[string]string "Forbidden (create permission or access denied)"
 // @Failure 404 {object} map[string]string "Source not found"
-// @Failure 413 {object} map[string]string "Request Entity Too Large (archive size exceeds maxArchiveSizeGB limit)"
+// @Failure 413 {object} map[string]string "Request Entity Too Large (archive exceeds the configured size limit)"
 // @Failure 500 {object} map[string]string "Internal server error"
 // @Router /api/resources/archive [post]
 func archiveCreateHandler(w http.ResponseWriter, r *http.Request, d *Context) (int, error) {
@@ -216,17 +215,12 @@ func archiveCreateHandler(w http.ResponseWriter, r *http.Request, d *Context) (i
 		return http.StatusBadRequest, fmt.Errorf("no paths accessible; add at least one path you have access to")
 	}
 
-	// Check archive size limit if configured
-	if settings.Config.Server.MaxArchiveSizeGB > 0 {
-		var estimatedSize int64
-		estimatedSize, err = computeArchiveSize(r.Context(), req.FromSource, itemPaths, d)
-		if err != nil {
-			return http.StatusInternalServerError, fmt.Errorf("failed to compute archive size: %v", err)
-		}
-		maxSizeBytes := settings.Config.Server.MaxArchiveSizeGB * 1024 * 1024 * 1024
-		if estimatedSize > maxSizeBytes {
-			return http.StatusRequestEntityTooLarge, fmt.Errorf("archive size would exceed the maximum allowed size (maxArchiveSize: %d GB)", settings.Config.Server.MaxArchiveSizeGB)
-		}
+	limits, err := state.GetArchiveLimits()
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+	if status, err := checkArchiveInputSize(r.Context(), req.FromSource, itemPaths, d, limits.CreateGiB); err != nil {
+		return status, err
 	}
 
 	var createErr error
@@ -279,7 +273,7 @@ func archiveCreateHandler(w http.ResponseWriter, r *http.Request, d *Context) (i
 // unarchiveHandler extracts an archive on the server. POST /resources/unarchive — server-side only.
 //
 // @Summary Extract an archive on the server
-// @Description Extracts a zip or tar.gz archive on the server into the given destination directory. Server-side only; no extracted bytes are returned. Supports extracting to a different source via toSource. Requires create permission. Archive size is checked against server.maxArchiveSizeGB limit if configured.
+// @Description Extracts a zip or tar.gz archive on the server into the given destination directory. Server-side only; no extracted bytes are returned. Supports extracting to a different source via toSource. Requires create permission. Archive size is checked against the archive size limit if configured.
 // @Description
 // @Description **Request body parameters:**
 // @Description - **fromSource** (string, required): Source name where the archive file lives. Example: `"default"`
@@ -297,7 +291,7 @@ func archiveCreateHandler(w http.ResponseWriter, r *http.Request, d *Context) (i
 // @Failure 400 {object} map[string]string "Invalid request (e.g. missing required field, unsupported format)"
 // @Failure 403 {object} map[string]string "Forbidden (create permission or access denied)"
 // @Failure 404 {object} map[string]string "Source or archive file not found"
-// @Failure 413 {object} map[string]string "Request Entity Too Large (archive size exceeds maxArchiveSizeGB limit)"
+// @Failure 413 {object} map[string]string "Request Entity Too Large (archive exceeds the configured size limit)"
 // @Failure 500 {object} map[string]string "Internal server error"
 // @Router /api/resources/unarchive [post]
 func unarchiveHandler(w http.ResponseWriter, r *http.Request, d *Context) (int, error) {
@@ -405,12 +399,12 @@ func unarchiveHandler(w http.ResponseWriter, r *http.Request, d *Context) (int, 
 		return http.StatusBadRequest, fmt.Errorf("path is not an archive file: %s", req.Path)
 	}
 
-	// Check archive size limit if configured
-	if settings.Config.Server.MaxArchiveSizeGB > 0 {
-		maxSizeBytes := settings.Config.Server.MaxArchiveSizeGB * 1024 * 1024 * 1024
-		if info.Size() > maxSizeBytes {
-			return http.StatusRequestEntityTooLarge, fmt.Errorf("archive size would exceed the maximum allowed size (maxArchiveSize: %d GB)", settings.Config.Server.MaxArchiveSizeGB)
-		}
+	limits, err := state.GetArchiveLimits()
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+	if err := checkArchiveSizeLimit(info.Size(), limits.ExtractGiB); err != nil {
+		return http.StatusRequestEntityTooLarge, err
 	}
 
 	lower := strings.ToLower(archiveReal)
@@ -754,18 +748,12 @@ func BuildAndStreamArchive(w http.ResponseWriter, r *http.Request, d *Context, s
 		return realPathErrStatus(err), err
 	}
 
-	limitGiB, err := state.ArchiveDownloadLimit()
+	limits, err := state.GetArchiveLimits()
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
-	if limitGiB > 0 {
-		estimatedSize, err := computeArchiveSize(r.Context(), source, fileList, d)
-		if err != nil {
-			return ErrToStatus(err), err
-		}
-		if estimatedSize > 0 && (estimatedSize-1)/(1<<30) >= limitGiB {
-			return http.StatusRequestEntityTooLarge, fmt.Errorf("archive exceeds the configured download limit of %d GiB", limitGiB)
-		}
+	if status, err := checkArchiveInputSize(r.Context(), source, fileList, d, limits.DownloadGiB); err != nil {
+		return status, err
 	}
 
 	SetContentDisposition(w, r, archiveAttachmentStem(fileList, realPath)+extension, false)
@@ -1565,6 +1553,27 @@ func preflightTarGz(archivePath, destDir string, policy *extractAccessPolicy) er
 				}
 			}
 		}
+	}
+	return nil
+}
+
+func checkArchiveInputSize(ctx context.Context, source string, paths []string, d *Context, limitGiB int64) (int, error) {
+	if limitGiB <= 0 {
+		return 0, nil
+	}
+	size, err := computeArchiveSize(ctx, source, paths, d)
+	if err != nil {
+		return ErrToStatus(err), fmt.Errorf("compute archive input size: %w", err)
+	}
+	if err := checkArchiveSizeLimit(size, limitGiB); err != nil {
+		return http.StatusRequestEntityTooLarge, err
+	}
+	return 0, nil
+}
+
+func checkArchiveSizeLimit(size, limitGiB int64) error {
+	if limitGiB > 0 && size > 0 && (size-1)/(1<<30) >= limitGiB {
+		return fmt.Errorf("archive exceeds the configured size limit of %d GiB", limitGiB)
 	}
 	return nil
 }

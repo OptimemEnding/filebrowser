@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "معاينة الحركة هي المعاينة المنبثقة المتحركة التي تتنقل عبر إطارات الفيديو أو الصور المتعددة لمجلد",
     "popupPreview": "العارض المنبثق",
     "popupPreviewDescription": "ستظهر نافذة منبثقة متراكبة فوق واجهة المستخدم عند التمرير فوق العناصر ذات الصور المصغرة",
-    "disableUpdateNotifications": "تعطيل إظهار تحديث الإشعارات",
-    "disableUpdateNotificationsDescription": "قم بتعطيل شعار تنبيه التحديث الذي يظهر للمستخدمين الإداريين على الشريط الجانبي.",
     "accountOptions": "خيارات الحساب",
     "showAdvancedProfile": "إظهار إعدادات الملف الشخصي المتقدمة",
     "showAdvancedProfileDescription": "اعرض إعدادات الملف الشخصي المصنفة في الشريط الجانبي بدلاً من عرض الملف الشخصي المبسط.",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "نص المقسم (اتركه فارغًا لإظهار سطر)",
-    "updateIsAvailable": "يتوفر تحديث!",
     "fileActions": "إجراءات الملف",
     "switchMode": "التبديل بين الروابط وشجرة التنقل",
     "customizeLinks": "تخصيص روابط الشريط الجانبي",

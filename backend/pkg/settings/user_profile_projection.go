@@ -72,7 +72,6 @@ func ProfileFromUser(u *users.User) UserProfile {
 			LockPassword:               u.LockPassword,
 			RequirePasswordChange:      u.RequirePasswordChange,
 			DisableSettings:            u.DisableSettings,
-			DisableUpdateNotifications: u.DisableUpdateNotifications,
 			ShowAdvancedProfile:        u.ShowAdvancedProfile,
 			AllowCustomShareURL:        boolPtr(u.AllowCustomShareURL),
 			MaxConcurrentTranscodes:    u.MaxConcurrentTranscodes,
@@ -94,7 +93,6 @@ func ExpandProfileIntoUser(u *users.User, p UserProfile) {
 	u.DisableSettings = p.Account.DisableSettings
 	u.LockPassword = p.Account.LockPassword
 	u.RequirePasswordChange = p.Account.RequirePasswordChange
-	u.DisableUpdateNotifications = p.Account.DisableUpdateNotifications
 	u.ShowAdvancedProfile = p.Account.ShowAdvancedProfile
 	// Profiles saved before this setting existed have no key; they keep custom share disabled (the default).
 	u.AllowCustomShareURL = boolValueOrDefault(p.Account.AllowCustomShareURL, false)

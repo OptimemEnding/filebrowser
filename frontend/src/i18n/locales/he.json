@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "תצוגה מקדימה של תנועה היא תצוגה מקדימה מוקפצת המציגה את פריימי הווידאו או מספר תמונות מתוך תיקייה.",
     "popupPreview": "צופה קופץ",
     "popupPreviewDescription": "חלון קופץ יופיע מעל ממשק המשתמש כאשר תעבור עם העכבר על פריטים עם תמונות ממוזערות.",
-    "disableUpdateNotifications": "השבת הצגת עדכוני התראות",
-    "disableUpdateNotificationsDescription": "השבת את כרזת הודעת העדכון המופיעה למשתמשים מנהלים בסרגל הצד.",
     "accountOptions": "אפשרויות חשבון",
     "showAdvancedProfile": "הצג הגדרות פרופיל מתקדמות",
     "showAdvancedProfileDescription": "הצג את הגדרות הפרופיל המסווגות בסרגל הצד במקום תצוגת הפרופיל הפשוטה.",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "טקסט מפריד (השאר ריק כדי להציג קו)",
-    "updateIsAvailable": "עדכון זמין!",
     "fileActions": "פעולות קובץ",
     "switchMode": "החלפה בין קישורים לעץ הניווט",
     "customizeLinks": "התאמה אישית של קישורי סרגל הצד",

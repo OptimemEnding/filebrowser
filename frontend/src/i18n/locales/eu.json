@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "Mugimendu-aurrebista bideoaren fotogramak edo karpeta bateko hainbat irudi txandakatzen dituen aurrebista animatu gainerakorra da",
     "popupPreview": "Ikustaile gainerakorra",
     "popupPreviewDescription": "Leiho gainerakor bat agertuko da interfazearen gainean, miniatura duten elementuen gainetik pasatzean",
-    "disableUpdateNotifications": "Desgaitu eguneratze-jakinarazpenak",
-    "disableUpdateNotificationsDescription": "Desgaitu administratzaileei alboko barran agertzen zaien eguneratze-jakinarazpenaren bannerra.",
     "accountOptions": "Kontuaren aukerak",
     "showAdvancedProfile": "Erakutsi profilaren ezarpen aurreratuak",
     "showAdvancedProfileDescription": "Erakutsi profilaren ezarpenak kategoriatan alboko barran, profilaren ikuspegi sinplifikatuaren ordez.",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "Bereizlearen testua (utzi hutsik lerro bat erakusteko)",
-    "updateIsAvailable": "Eguneratze bat dago erabilgarri!",
     "fileActions": "Fitxategi-ekintzak",
     "switchMode": "Txandakatu estekak eta nabigazio-zuhaitza",
     "customizeLinks": "Pertsonalizatu alboko barrako estekak",

@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "Rörelseförhandsgranskning är den animerade popup-förhandsgranskningen som cyklar genom bildrutorna i videon eller flera bilder för en mapp",
     "popupPreview": "Popup-visning",
     "popupPreviewDescription": "Ett överliggande popup-fönster visas över användargränssnittet när du håller muspekaren över objekt med miniatyrbilder",
-    "disableUpdateNotifications": "Avaktivera visning av uppdaterade meddelanden",
-    "disableUpdateNotificationsDescription": "Inaktivera bannern för uppdateringsmeddelanden som visas för administratörsanvändare i sidofältet.",
     "accountOptions": "Kontoalternativ",
     "showAdvancedProfile": "Visa avancerade profilinställningar",
     "showAdvancedProfileDescription": "Visa de kategoriserade profilinställningarna i sidofältet istället för den förenklade profilvyn.",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "Delningstext (lämna tom för att visa en rad)",
-    "updateIsAvailable": "En uppdatering är tillgänglig!",
     "fileActions": "Filåtgärder",
     "switchMode": "Växla mellan länkar och navigeringsträdet",
     "customizeLinks": "Anpassa länkar i sidofältet",

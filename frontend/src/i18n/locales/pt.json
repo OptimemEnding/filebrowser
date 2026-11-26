@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "A pré-visualização de movimento é a pré-visualização pop-up animada que percorre os fotogramas do vídeo ou várias imagens de uma pasta",
     "popupPreview": "Visualizador de pop-up",
     "popupPreviewDescription": "Será apresentada uma janela pop-up de sobreposição sobre a IU quando se passa o rato sobre itens com miniaturas",
-    "disableUpdateNotifications": "Desativar a apresentação da notificação de atualização",
-    "disableUpdateNotificationsDescription": "Desativar a faixa de notificação de atualização que aparece para os utilizadores administrativos na barra lateral.",
     "accountOptions": "Opções da conta",
     "showAdvancedProfile": "Mostrar definições avançadas do perfil",
     "showAdvancedProfileDescription": "Mostrar as definições do perfil por categorias na barra lateral, em vez da visualização simplificada do perfil.",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "Texto do separador (deixar em branco para mostrar uma linha)",
-    "updateIsAvailable": "Está disponível uma atualização!",
     "fileActions": "Acções do ficheiro",
     "switchMode": "Alternar entre os links e a árvore de navegação",
     "customizeLinks": "Personalizar ligações da barra lateral",

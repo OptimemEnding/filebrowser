@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "L'anteprima animata cicla i fotogrammi del video o le immagini di una cartella al passaggio del mouse.",
     "popupPreview": "Visualizzatore pop-up",
     "popupPreviewDescription": "Mostra una finestra in sovrapposizione quando si passa sopra elementi con miniature.",
-    "disableUpdateNotifications": "Disabilita notifiche di aggiornamento",
-    "disableUpdateNotificationsDescription": "Nasconde il banner degli aggiornamenti disponibile agli amministratori.",
     "accountOptions": "Opzioni dell'account",
     "showAdvancedProfile": "Mostra le impostazioni avanzate del profilo",
     "showAdvancedProfileDescription": "Mostra le impostazioni del profilo suddivise per categorie nella barra laterale, anziché la visualizzazione semplificata del profilo.",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "Testo divisore (vuoto per una linea)",
-    "updateIsAvailable": "Un aggiornamento è disponibile!",
     "fileActions": "Azioni file",
     "switchMode": "Passa dai link all'albero di navigazione e viceversa",
     "customizeLinks": "Personalizza Link Barra Laterale",

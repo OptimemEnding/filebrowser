@@ -738,9 +738,16 @@ func loadConfigWithDefaults(configFile string, generate bool) error {
 		}
 	}
 
+	// Ignore retired update settings in existing configuration files.
+	if server, ok := filteredConfig["server"].(map[string]interface{}); ok {
+		delete(server, "disableUpdateCheck")
+	}
 	if udRaw, ok := filteredConfig["userDefaults"]; ok {
 		Env.ConfigUserDefaultsSpecified = true
 		if udMap, ok := udRaw.(map[string]interface{}); ok {
+			if account, ok := udMap["account"].(map[string]interface{}); ok {
+				delete(account, "disableUpdateNotifications")
+			}
 			Env.ConfigUserDefaultsSpecifiedPaths = CollectMapLeafPaths(udMap, "")
 		}
 	}
@@ -961,9 +968,9 @@ func SetDefaults(generate bool) Settings {
 					FlushMaxBuffers:      500,
 				},
 			},
-			SourceMap:        map[string]*Source{},
-			NameToSource:     map[string]*Source{},
-			CacheDir:         "tmp",
+			SourceMap:    map[string]*Source{},
+			NameToSource: map[string]*Source{},
+			CacheDir:     "tmp",
 			IndexSqlConfig: IndexSqlConfig{
 				WalMode:               false,
 				BatchSize:             1000,
@@ -1060,14 +1067,13 @@ func SetDefaults(generate bool) Settings {
 					Share:    false,
 					Realtime: false,
 				},
-				LockPassword:               false,
-				RequirePasswordChange:      false,
-				DisableSettings:            false,
-				LoginMethod:                "",
-				DisableUpdateNotifications: false,
-				ShowAdvancedProfile:        false,
-				AllowCustomShareURL:        boolPtr(false),
-				MaxConcurrentTranscodes:    1,
+				LockPassword:            false,
+				RequirePasswordChange:   false,
+				DisableSettings:         false,
+				LoginMethod:             "",
+				ShowAdvancedProfile:     false,
+				AllowCustomShareURL:     boolPtr(false),
+				MaxConcurrentTranscodes: 1,
 			},
 		},
 	}

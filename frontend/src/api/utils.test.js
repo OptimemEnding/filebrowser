@@ -23,7 +23,6 @@ vi.mock('@/utils/constants', () => {
       commitSHA: "test",
       disableExternal: false,
       externalLinks: [],
-      updateAvailable: "",
     },
     logoURL: "test-logo.png",
     origin: "http://localhost",

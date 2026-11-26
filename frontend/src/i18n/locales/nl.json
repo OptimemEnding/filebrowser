@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "Bewegingsvoorbeeld is het geanimeerde popup-voorbeeld dat door de frames van de video of meerdere afbeeldingen voor een map loopt",
     "popupPreview": "Pop-up Voorbeeldweergave",
     "popupPreviewDescription": "Er verschijnt een overlay pop-upvenster over de UI wanneer u met de muis over items met miniaturen beweegt",
-    "disableUpdateNotifications": "Het tonen van meldingen update uitschakelen",
-    "disableUpdateNotificationsDescription": "Schakel de banner met updatemeldingen uit die wordt weergegeven voor beheerders in de zijbalk.",
     "accountOptions": "Accountopties",
     "showAdvancedProfile": "Geavanceerde profielinstellingen weergeven",
     "showAdvancedProfileDescription": "Toon de profielinstellingen per categorie in de zijbalk in plaats van de vereenvoudigde profielweergave.",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "Scheidingstekst (leeg laten om een lijn weer te geven)",
-    "updateIsAvailable": "Er is een update beschikbaar!",
     "fileActions": "Bestandsacties",
     "switchMode": "Schakelen tussen links en navigatiestructuur",
     "customizeLinks": "Zijbalk koppelingen aanpassen",

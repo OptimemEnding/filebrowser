@@ -586,8 +586,6 @@
     "previewMotionVideosDescription": "Die Bewegungsvorschau ist eine animierte Popup-Vorschau, die durch die Einzelbilder eines Videos oder mehrerer Bilder eines Ordners führt.",
     "popupPreview": "Pop-up-Betrachter",
     "popupPreviewDescription": "Ein Overlay-Pop-up-Fenster wird über der Benutzeroberfläche angezeigt, wenn der Mauszeiger über Elemente mit Miniaturansichten bewegt wird",
-    "disableUpdateNotifications": "Deaktivieren der Anzeige von Aktualisierungsmeldungen",
-    "disableUpdateNotificationsDescription": "Deaktivieren Sie das Banner für Update-Benachrichtigungen, das für Admin-Benutzer in der Seitenleiste angezeigt wird.",
     "accountOptions": "Kontooptionen",
     "showAdvancedProfile": "Erweiterte Profileinstellungen anzeigen",
     "showAdvancedProfileDescription": "Zeige die nach Kategorien geordneten Profileinstellungen in der Seitenleiste anstelle der vereinfachten Profilansicht an.",
@@ -767,7 +765,6 @@
   },
   "sidebar": {
     "dividerNamePlaceholder": "Teilertext (leer lassen, um eine Zeile anzuzeigen)",
-    "updateIsAvailable": "Ein Update ist verfügbar!",
     "fileActions": "Datei-Aktionen",
     "switchMode": "Zwischen Links und Navigationsbaum umschalten",
     "customizeLinks": "Links in der Seitenleiste anpassen",

@@ -84,7 +84,6 @@ func TestApplyUserDefaults_copiesUserDefaultsOntoUser(t *testing.T) {
 				LockPassword:               true,
 				DisableSettings:            true,
 				LoginMethod:                "password",
-				DisableUpdateNotifications: true,
 			},
 		},
 	}
@@ -124,7 +123,6 @@ func TestApplyUserDefaults_copiesUserDefaultsOntoUser(t *testing.T) {
 				QuickDownload:              true,
 				DisablePreviewExt:          ".exe",
 				DisableViewingExt:          ".bat",
-				DisableUpdateNotifications: true,
 				DisableOfficePreviewExt:    ".x", // deprecated: mapped to DisableOnlyOfficeExt
 				DisableOnlyOfficeExt:       ".x",
 				CustomTheme:                "Night",

@@ -561,8 +561,6 @@ export interface MessageParams {
   "profileSettings.previewMotionVideosDescription": never;
   "profileSettings.popupPreview": never;
   "profileSettings.popupPreviewDescription": never;
-  "profileSettings.disableUpdateNotifications": never;
-  "profileSettings.disableUpdateNotificationsDescription": never;
   "profileSettings.accountOptions": never;
   "profileSettings.showAdvancedProfile": never;
   "profileSettings.showAdvancedProfileDescription": never;
@@ -732,7 +730,6 @@ export interface MessageParams {
   "time.months": "prefix" | "suffix";
   "time.timeUnit": never;
   "sidebar.dividerNamePlaceholder": never;
-  "sidebar.updateIsAvailable": never;
   "sidebar.fileActions": never;
   "sidebar.switchMode": never;
   "sidebar.customizeLinks": never;
@@ -854,6 +851,12 @@ export interface MessageParams {
   "fileLoading.downloadChunkSizeMbHelp": never;
   "fileLoading.archiveDownloadLimit": never;
   "fileLoading.archiveDownloadLimitHelp": never;
+  "fileLoading.archiveCreateLimit": never;
+  "fileLoading.archiveCreateLimitHelp": never;
+  "fileLoading.archiveExtractLimit": never;
+  "fileLoading.archiveExtractLimitHelp": never;
+  "fileLoading.archiveDownloadDirect": never;
+  "fileLoading.archiveDownloadBufferFailed": never;
   "fileLoading.archiveDownloadTooLarge": never;
   "fileLoading.archiveDownloadPreparing": never;
   "fileLoading.archiveDownloadTransferred": "size";

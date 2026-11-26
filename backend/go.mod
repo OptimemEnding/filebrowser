@@ -30,7 +30,6 @@ require (
 	github.com/swaggo/swag v1.16.6
 	golang.org/x/crypto v0.59.0
 	golang.org/x/image v0.48.0
-	golang.org/x/mod v0.43.0
 	golang.org/x/net v0.63.0
 	golang.org/x/oauth2 v0.38.0
 	golang.org/x/sync v0.25.0
@@ -95,6 +94,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go.etcd.io/bbolt v1.5.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.6 // indirect
+	golang.org/x/mod v0.43.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
