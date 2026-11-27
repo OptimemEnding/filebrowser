@@ -893,7 +893,7 @@
     "uploadChunkSizeMb": "上传块大小（以 MB 为单位",
     "uploadChunkSizeMbHelp": "通常为 5 至 50 MB，对于不稳定或受限制的连接，越小越好。设置为 0 将禁用上传分块。",
     "downloadChunkSizeMb": "下载块大小（MB）",
-    "downloadChunkSizeMbHelp": "单文件的下载块大小，单位为 MB。超过此大小的单文件将分块下载。设为 0 表示不分块。",
+    "downloadChunkSizeMbHelp": "单个大文件的下载块大小，单位为 MB。需要浏览器支持 Service Worker 流式下载。设为 0 时使用普通下载。",
     "archiveDownloadLimit": "打包下载上限（GiB）",
     "archiveDownloadLimitHelp": "按选中待下载文件的总大小计算。设为 0 表示不限。",
     "archiveCreateLimit": "创建归档上限（GiB）",

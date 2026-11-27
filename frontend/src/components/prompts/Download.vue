@@ -176,11 +176,7 @@ function archiveStatus(download: DownloadItem): string {
 }
 
 function formatDownloadError(download: DownloadItem): string {
-  if (download.status !== "error") {
-    return "";
-  }
-  const detail = download.errorDetails ? String(download.errorDetails) : t("prompts.error");
-  return download.archiveRequest ? detail : t("prompts.downloadFailed", { message: detail });
+  return download.errorDetails || t("notifications.downloadFailedTitle");
 }
 
 function handleFormatSelect(format: string) {

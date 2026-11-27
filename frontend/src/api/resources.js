@@ -14,6 +14,7 @@ import { rememberViewToken } from "./viewToken.js"
 import { isMediaFile } from "@/utils/mediaFile.js"
 import { isDirectoryItem } from "@/utils/directoryItem.js"
 import { getObjectProperty } from "@/utils/object.js"
+import { beginBrowserDownload, prepareBrowserDownload } from "@/utils/streamDownload.js"
 import { getStreamURL } from "./media.ts"
 import {
   invalidateDirMetadataItem,
@@ -300,22 +301,8 @@ export async function put(source, path, content = '') {
 }
 
 export async function download(format, files, shareHash = "", { directArchive = false } = {}) {
-  const downloadChunkSizeMb = state.user?.fileLoading?.downloadChunkSizeMb || 0
-  const sizeThreshold = downloadChunkSizeMb * 1024 * 1024
-
   const isMultiItemArchive =
     files.length > 1 || (files.length === 1 && isDirectoryItem(files[0]))
-
-  const useChunkedDownload =
-    downloadChunkSizeMb > 0 &&
-    files.length === 1 &&
-    !isDirectoryItem(files[0]) &&
-    files[0].size &&
-    files[0].size >= sizeThreshold
-
-  if (useChunkedDownload) {
-    return await downloadChunked(files[0], shareHash)
-  }
 
   if (format !== 'zip') {
     format = 'tar.gz'
@@ -353,6 +340,18 @@ export async function download(format, files, shareHash = "", { directArchive = 
 
   if (isMultiItemArchive) {
     return downloadArchive(url, format, files, shareHash, directArchive)
+  }
+
+  const chunkSize = Math.floor((state.user?.fileLoading?.downloadChunkSizeMb || 0) * 1024 * 1024)
+  const fileSize = Number(files[0]?.size)
+  if (chunkSize > 0 && Number.isSafeInteger(fileSize) && fileSize >= chunkSize) {
+    const delivery = await prepareBrowserDownload()
+    if (delivery && await downloadChunked(delivery, url, files[0], fileSize, chunkSize, shareHash)) return
+    // Refresh the share cookie for the native download using the current share password.
+    if (shareHash && getSharePasswordFromStorage(shareHash)) {
+      const response = await fetch(url, shareDownloadFetchInit(shareHash, 'HEAD'))
+      if (!response.ok) throw new Error(response.statusText || `HTTP ${response.status}`)
+    }
   }
   startNativeDownload(url)
 }
@@ -542,94 +541,38 @@ async function readDownloadErrorBody(response) {
   return ''
 }
 
-/** Parse total size from Content-Range: bytes 0-0/12345 */
-function totalFromContentRange(headerVal) {
-  if (!headerVal || typeof headerVal !== 'string') return 0
-  const idx = headerVal.lastIndexOf('/')
-  if (idx === -1) return 0
-  const n = Number.parseInt(headerVal.slice(idx + 1), 10)
-  return Number.isFinite(n) ? n : 0
+function parseDownloadContentRange(header) {
+  const match = /^bytes (\d+)-(\d+)\/(\d+)$/i.exec(header ?? '')
+  if (!match) return null
+
+  const [start, end, total] = match.slice(1).map(Number)
+  if (![start, end, total].every(Number.isSafeInteger) || start > end || end >= total) {
+    return null
+  }
+  return { start, end, total }
 }
 
-async function resolveDownloadContentLength(url, shareHash) {
-  let res = await fetch(url, shareDownloadFetchInit(shareHash, 'HEAD'))
-  if (res.ok) {
-    const cl = res.headers.get('Content-Length')
-    if (cl) {
-      const n = Number.parseInt(cl, 10)
-      if (Number.isFinite(n) && n > 0) {
-        return n
-      }
-    }
-  }
-  res = await fetch(url, shareDownloadFetchInit(shareHash, 'GET', { Range: 'bytes=0-0' }))
-  const cancelBody = () => {
-    if (res.body && typeof res.body.cancel === 'function') {
-      res.body.cancel().catch(() => {})
-    }
-  }
-  try {
-    if (res.status === 206) {
-      const total = totalFromContentRange(res.headers.get('Content-Range'))
-      if (total > 0) {
-        cancelBody()
-        return total
-      }
-    }
-    if (res.ok) {
-      const cl = res.headers.get('Content-Length')
-      if (cl) {
-        const n = Number.parseInt(cl, 10)
-        if (Number.isFinite(n) && n > 0) {
-          cancelBody()
-          return n
-        }
-      }
-    }
-    cancelBody()
-    return 0
-  } catch (e) {
-    cancelBody()
-    throw e
-  }
-}
-
-/**
- * Range-based fetch; updates downloadManager progress for downloadId.
- * @returns {Promise<Blob|null>}
- */
-async function chunkedRangeDownloadToBlob(
-  baseUrl,
-  fileSize,
-  chunkSize,
-  downloadId,
-  abortController,
-  shareHash
-) {
-  const chunks = []
+async function* readDownloadRanges(url, chunkSize, downloadItem, signal, shareHash) {
   let offset = 0
-  let loaded = 0
-  if (!Number.isFinite(fileSize) || fileSize <= 0) {
-    throw new Error('Invalid file size for chunked download')
-  }
-  /** May be corrected from Content-Range when the listing size disagrees with the file on disk. */
-  let totalSize = fileSize
+  let totalSize = downloadItem.size
+  let validator = null
 
   while (offset < totalSize) {
-    const downloadItem = downloadManager.findById(downloadId)
-    if (downloadItem?.status === 'cancelled') {
-      return null
-    }
+    signal.throwIfAborted()
 
     const end = Math.min(offset + chunkSize - 1, totalSize - 1)
     const rangeHeader = `bytes=${offset}-${end}`
 
-    const response = await fetch(baseUrl, {
-      ...shareDownloadFetchInit(shareHash, 'GET', { Range: rangeHeader }),
-      signal: abortController.signal,
+    const response = await fetch(url, {
+      ...shareDownloadFetchInit(shareHash, 'GET', {
+        Range: rangeHeader,
+        ...(validator && { 'If-Range': validator }),
+      }),
+      cache: 'no-store',
+      signal,
     })
 
-    if (!response.ok && response.status !== 206) {
+    if (!response.ok) {
       const body = (await readDownloadErrorBody(response)).trim()
       const fromHttp =
         body ||
@@ -637,206 +580,148 @@ async function chunkedRangeDownloadToBlob(
       throw new Error(fromHttp || 'Request failed')
     }
 
-    if (!response.body) {
-      throw new Error(
-        [response.statusText, `HTTP ${response.status}`].filter(Boolean).join(' ').trim() ||
-          'No response body'
-      )
-    }
-
+    let expectedChunkSize = null
     if (response.status === 206) {
-      const fromCr = totalFromContentRange(response.headers.get('Content-Range'))
-      if (fromCr > 0) {
-        totalSize = fromCr
-        const dl = downloadManager.findById(downloadId)
-        if (dl) {
-          dl.size = fromCr
-        }
+      const range = parseDownloadContentRange(response.headers.get('Content-Range'))
+      if (
+        !range || range.start !== offset || range.end > end ||
+        (offset > 0 && range.total !== totalSize)
+      ) {
+        throw new Error('Invalid Content-Range in download response')
       }
-    } else if (response.status === 200) {
-      const clFull = response.headers.get('Content-Length')
-      if (clFull) {
-        const n = Number.parseInt(clFull, 10)
-        if (Number.isFinite(n) && n > 0) {
-          totalSize = n
-          const dl = downloadManager.findById(downloadId)
-          if (dl) {
-            dl.size = n
-          }
-        }
+      totalSize = range.total
+      expectedChunkSize = range.end - range.start + 1
+      const etag = response.headers.get('ETag')
+      const responseValidator = etag && !etag.startsWith('W/') ? etag : response.headers.get('Last-Modified')
+      if (validator && responseValidator && responseValidator !== validator) {
+        throw new Error('The source file changed during download')
       }
+      if (offset === 0) validator = responseValidator
+    } else if (response.status === 200 && offset === 0) {
+      const contentLength = response.headers.get('Content-Length')
+      const encoding = response.headers.get('Content-Encoding')
+      const length = Number(contentLength)
+      if (
+        contentLength !== null && (!encoding || encoding === 'identity') &&
+        Number.isSafeInteger(length) && length >= 0
+      ) {
+        totalSize = length
+        expectedChunkSize = length
+      }
+    } else {
+      throw new Error(`Unexpected HTTP ${response.status} for download range ${rangeHeader}`)
     }
+    downloadItem.size = totalSize
 
-    const cl = response.headers.get('Content-Length')
-    let expectedChunkSize = end - offset + 1
-    if (cl) {
-      const n = Number.parseInt(cl, 10)
-      if (Number.isFinite(n) && n > 0) {
-        expectedChunkSize = n
-      }
+    if (!response.body) {
+      throw new Error('No response body')
     }
-
-    const reader = response.body.getReader()
-    const chunkParts = []
     let chunkLoaded = 0
     let lastProgressUpdate = 0
-    const progressUpdateInterval = Math.max(50000, expectedChunkSize / 50)
+    const progressUpdateInterval = Math.max(50000, (expectedChunkSize ?? totalSize) / 50)
 
+    const reader = response.body.getReader()
     try {
-      let reading = true
-      while (reading) {
+      while (true) {
         const { done, value } = await reader.read()
-        if (done) {
-          reading = false
-          break
+        signal.throwIfAborted()
+        if (done) break
+        chunkLoaded += value.byteLength
+        if (expectedChunkSize !== null && chunkLoaded > expectedChunkSize) {
+          throw new Error('Download response exceeded its expected size')
         }
-
-        chunkParts.push(value)
-        chunkLoaded += value.length
-
-        const chunkProgress = Math.min(chunkLoaded, expectedChunkSize)
-        const totalLoaded = offset + chunkProgress
-
         if (
           chunkLoaded - lastProgressUpdate >= progressUpdateInterval ||
-          chunkLoaded >= expectedChunkSize
+          chunkLoaded === expectedChunkSize
         ) {
-          downloadManager.updateProgress(downloadId, totalLoaded, totalSize)
+          const loaded = offset + chunkLoaded
+          downloadManager.updateProgress(downloadItem.id, loaded, Math.max(totalSize, loaded))
           lastProgressUpdate = chunkLoaded
         }
+        yield value
       }
-    } catch (readError) {
-      const currentDownload = downloadManager.findById(downloadId)
-      if (readError.name === 'AbortError' || (currentDownload?.status === 'cancelled')) {
-        downloadManager.setStatus(downloadId, 'cancelled')
-        return null
-      }
-      throw readError
+    } finally {
+      reader.releaseLock()
     }
 
-    if (chunkLoaded < expectedChunkSize) {
+    if (expectedChunkSize !== null && chunkLoaded !== expectedChunkSize) {
       throw new Error('Connection closed before the full chunk was received')
     }
 
-    const chunk = new Uint8Array(chunkLoaded)
-    let position = 0
-    for (const part of chunkParts) {
-      chunk.set(part, position)
-      position += part.length
+    offset += chunkLoaded
+    if (response.status === 200) {
+      totalSize = offset
+      downloadItem.size = totalSize
     }
-
-    const chunkToUse =
-      chunk.byteLength > expectedChunkSize
-        ? chunk.slice(0, expectedChunkSize).buffer
-        : chunk.buffer
-
-    chunks.push(chunkToUse)
-    loaded += expectedChunkSize
-    downloadManager.updateProgress(downloadId, loaded, totalSize)
-    offset += expectedChunkSize
+    downloadManager.updateProgress(downloadItem.id, offset, totalSize)
   }
-
-  return new Blob(chunks, { type: 'application/octet-stream' })
 }
 
-async function downloadChunked(file, shareHash = "") {
-  const chunkSizeMb = state.user?.fileLoading?.downloadChunkSizeMb || 0
-
-  if (chunkSizeMb === 0) {
-    throw new Error("Chunked download is disabled (chunk size is 0)")
-  }
-  const chunkSize = chunkSizeMb * 1024 * 1024 // Convert MB to bytes
-
-  // Extract filename from path if name is not available
-  const fileName = file.name || (file.path ? file.path.split('/').pop() : 'download')
-
-  const params = {
-    file: file.path,
-    ...(shareHash && { hash: shareHash }),
-    ...(!shareHash && file.source && { source: file.source }),
-    sessionId: state.sessionId
-  }
-
-  const apiPath = getApiPath("resources/download", params, false, shareHash !== "")
-  const baseUrl = window.origin + apiPath
-
-  let fileSize = Number(file.size)
-  // Probe failures happen before a download entry exists, so report them here. Callers may
-  // suppress the error they rethrow (silentChunkedError), which would otherwise hide it.
-  try {
-    const serverLen = await resolveDownloadContentLength(baseUrl, shareHash)
-    if (Number.isFinite(serverLen) && serverLen > 0) {
-      fileSize = serverLen
-    }
-  } catch (error) {
-    if (error?.name !== 'AbortError') {
-      notifyDownloadError(fileName, error?.message || 'Could not determine file size for chunked download')
-    }
-    throw error
-  }
-  if (!Number.isFinite(fileSize) || fileSize <= 0) {
-    const sizeError = 'Could not determine file size for chunked download'
-    notifyDownloadError(fileName, sizeError)
-    throw new Error(sizeError)
-  }
-
-  const queuedFile = { ...file, size: fileSize }
-  const downloadId = downloadManager.add(queuedFile, shareHash)
-
-  downloadManager.setStatus(downloadId, "downloading")
-
-  showDownloadPanel()
-
+async function downloadChunked(delivery, url, file, fileSize, chunkSize, shareHash) {
+  const fileName = file.name || file.path?.split('/').filter(Boolean).at(-1) || 'download'
+  const downloadId = downloadManager.add({ ...file, size: fileSize }, shareHash)
   const downloadItem = downloadManager.findById(downloadId)
   const abortController = new AbortController()
   downloadItem.abortController = abortController
+  downloadManager.setStatus(downloadId, 'downloading')
 
+  const { signal } = abortController
+  const ranges = readDownloadRanges(url, chunkSize, downloadItem, signal, shareHash)
+  const transfer = Promise.withResolvers()
+  const body = new ReadableStream({
+    async pull(controller) {
+      try {
+        const { done, value } = await ranges.next()
+        if (done) {
+          controller.close()
+          transfer.resolve()
+        } else {
+          controller.enqueue(value)
+        }
+      } catch (error) {
+        controller.error(error)
+        transfer.reject(error)
+      }
+    },
+    async cancel(reason) {
+      transfer.reject(reason instanceof Error ? reason : new DOMException('Download cancelled', 'AbortError'))
+      abortController.abort()
+      await ranges.return()
+    },
+  }, { highWaterMark: 0 })
+
+  let iframe
   try {
-    const blob = await chunkedRangeDownloadToBlob(
-      baseUrl,
-      fileSize,
-      chunkSize,
-      downloadId,
-      abortController,
-      shareHash
-    )
-    if (!blob) {
-      return
-    }
-
-    const blobUrl = URL.createObjectURL(blob)
-
-    const link = document.createElement('a')
-    link.href = blobUrl
-    link.download = fileName
-    link.style.display = 'none'
-    document.body.appendChild(link)
-    link.click()
-
-    downloadManager.setStatus(downloadId, "completed")
-    const dlDone = downloadManager.findById(downloadId)
-    const finalSize = dlDone?.size ?? fileSize
-    downloadManager.updateProgress(downloadId, finalSize, finalSize)
-    notifyDownloadComplete(fileName, finalSize)
-
-    setTimeout(() => {
-      document.body.removeChild(link)
-      URL.revokeObjectURL(blobUrl)
-    }, 100)
+    await Promise.all([
+      beginBrowserDownload(delivery, fileName, body, signal).then((frame) => {
+        iframe = frame
+        showDownloadPanel()
+      }),
+      transfer.promise,
+    ])
+    signal.throwIfAborted()
+    downloadManager.setStatus(downloadId, 'completed')
+    notifyDownloadComplete(fileName, downloadItem.size)
   } catch (error) {
-    // Check if download was cancelled by user
-    const currentDownload = downloadManager.findById(downloadId);
-    if (error.name === 'AbortError' || (currentDownload?.status === "cancelled")) {
-      downloadManager.setStatus(downloadId, "cancelled")
-      // Don't throw error or show notification for user-initiated cancellation
-      return;
+    const cancelled = signal.aborted || error?.name === 'AbortError'
+    abortController.abort()
+    if (!iframe) {
+      downloadManager.remove(downloadId)
+      return cancelled
+    }
+    if (cancelled) {
+      downloadManager.setStatus(downloadId, 'cancelled')
+      return true
     }
     const message =
       error instanceof Error ? error.message || "Unknown error" : String(error)
     downloadManager.setError(downloadId, message)
-    notifyDownloadError(fileName, message)
-    throw error
+    notifyDownloadError(downloadItem.name, message)
+  } finally {
+    iframe?.remove()
+    downloadItem.abortController = null
   }
+  return true
 }
 
 /**

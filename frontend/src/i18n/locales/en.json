@@ -893,7 +893,7 @@
     "uploadChunkSizeMb": "Upload chunk size in MB",
     "uploadChunkSizeMbHelp": "Typically 5 to 50 MB, smaller is better for unstable or restricted connections. Setting to 0 will disable upload chunking.",
     "downloadChunkSizeMb": "Download chunk size in MB",
-    "downloadChunkSizeMbHelp": "Chunk size for individual files in MB. Larger individual files are downloaded in chunks. Set to 0 to disable individual-file chunking.",
+    "downloadChunkSizeMbHelp": "Chunk size in MB for large individual files. Requires browser support for streaming downloads through a service worker. Set to 0 to use standard downloads.",
     "archiveDownloadLimit": "Archive download limit (GiB)",
     "archiveDownloadLimitHelp": "Limits the total size of files selected for download as an archive. Set to 0 for unlimited.",
     "archiveCreateLimit": "Archive creation limit (GiB)",

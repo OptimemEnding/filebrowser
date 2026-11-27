@@ -74,6 +74,7 @@ func recaptchaSettings(pwd settings.PasswordAuthConfig) (enabled bool, host, key
 // spaContentSecurityPolicy restricts only scripts. srcdoc preview frames inherit
 // this header, blocking inline scripts without limiting frames, images, or API calls.
 // worker-src blob: is required for Ace editor web workers (analytics/config preview).
+// Same-origin workers serve streamed downloads to the browser's download manager.
 func spaContentSecurityPolicy(nonce string) string {
 	policy := fmt.Sprintf(
 		"script-src 'self' 'nonce-%s' https://cdn.jsdelivr.net https://www.google.com https://www.gstatic.com",
@@ -82,7 +83,7 @@ func spaContentSecurityPolicy(nonce string) string {
 	for _, origin := range onlyOfficeScriptSrcOrigins() {
 		policy += " " + origin
 	}
-	policy += "; worker-src blob:"
+	policy += "; worker-src blob: 'self'"
 	return policy
 }
 

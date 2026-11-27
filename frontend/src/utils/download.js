@@ -16,29 +16,10 @@ export default function downloadFiles(items) {
     // map the index to state.req.items
     items = items.map(i => state.req.items.at(i));
   }
-  
-  // The chunk size only applies to individual files.
-  const downloadChunkSizeMb = state.user?.fileLoading?.downloadChunkSizeMb || 0
-  const sizeThreshold = downloadChunkSizeMb * 1024 * 1024;
-  
-  const willUseChunkedDownload =
-    downloadChunkSizeMb > 0 &&
-    items.length === 1 &&
-    !isDirectoryItem(items[0]) &&
-    items[0].size &&
-    items[0].size >= sizeThreshold
-
   if (getters.isShare()) {
     // Perform download without opening a new window
     if (isSingleFileItem(items)) {
-      if (willUseChunkedDownload) {
-        mutations.showPrompt({ name: "download" });
-        void startDownload(null, items, state.shareInfo.hash, {
-          silentChunkedError: true,
-        });
-      } else {
-        void startDownload(null, items, state.shareInfo.hash);
-      }
+      void startDownload(null, items, state.shareInfo.hash);
     } else {
       // Multiple files download with user confirmation
       mutations.showPrompt({
@@ -53,12 +34,7 @@ export default function downloadFiles(items) {
   }
 
   if (isSingleFileItem(items)) {
-    if (willUseChunkedDownload) {
-      mutations.showPrompt({ name: "download" });
-      void startDownload(null, items, "", { silentChunkedError: true });
-    } else {
-      void startDownload(null, items);
-    }
+    void startDownload(null, items);
   } else {
     // Multiple files download with user confirmation
     mutations.showPrompt({
@@ -79,9 +55,6 @@ async function startDownload(config, files, hash = "", options = {}) {
     if (e?.name === "AbortError" || e?.message?.includes("aborted") || e?.message?.includes("cancelled")) {
       return;
     }
-    if (options.silentChunkedError) {
-      return;
-    }
     notify.showError(`Error downloading: ${e.message || e}`);
   }
 }
@@ -96,23 +69,8 @@ export function showShareDownloadPrompt(items) {
     items = items.map((i) => state.req.items.at(i));
   }
 
-  const downloadChunkSizeMb = state.user?.fileLoading?.downloadChunkSizeMb || 0;
-  const sizeThreshold = downloadChunkSizeMb * 1024 * 1024;
-  const willUseChunkedDownload =
-    downloadChunkSizeMb > 0 &&
-    items.length === 1 &&
-    !isDirectoryItem(items[0]) &&
-    items[0].size &&
-    items[0].size >= sizeThreshold;
   if (isSingleFileItem(items)) {
-    if (willUseChunkedDownload) {
-      mutations.showPrompt({ name: "download" });
-      void startDownload(null, items, state.shareInfo?.hash || "", {
-        silentChunkedError: true,
-      });
-    } else {
-      void startDownload(null, items, state.shareInfo?.hash || "");
-    }
+    void startDownload(null, items, state.shareInfo?.hash || "");
     return;
   }
 
