@@ -248,6 +248,15 @@ func publicShareMediaContentPolicy(d *Context) (int, error) {
 }
 
 func RawFilesHandler(w http.ResponseWriter, r *http.Request, d *Context, source string, fileList []string) (int, error) {
+	if id := r.URL.Query().Get("downloadId"); r.Method == http.MethodGet && id != "" {
+		return trackDownloadResponse(w, r, d, id, func(w http.ResponseWriter, r *http.Request) (int, error) {
+			return serveRawFiles(w, r, d, source, fileList)
+		})
+	}
+	return serveRawFiles(w, r, d, source, fileList)
+}
+
+func serveRawFiles(w http.ResponseWriter, r *http.Request, d *Context, source string, fileList []string) (int, error) {
 	if d.Share.Hash == "" {
 		filePerms, err := effectiveFilePerms(d, source)
 		if err != nil {
@@ -338,7 +347,9 @@ func RawFilesHandler(w http.ResponseWriter, r *http.Request, d *Context, source 
 		if err != nil {
 			return http.StatusForbidden, err
 		}
-		status, err = ServeSingleFile(w, r, d, source, firstFilePath, fileName, ServeSingleFileOptions{ForceInline: forceInline})
+		status, err = ServeSingleFile(w, r, d, source, firstFilePath, fileName, ServeSingleFileOptions{
+			ForceInline: forceInline, TrackDownload: true,
+		})
 		if r.Method == http.MethodGet && downloadResponseRecordsActivity(status, err) {
 			activity.RecordDownload(r, toActor(d), source, displayFileList)
 		}

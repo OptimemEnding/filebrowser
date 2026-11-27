@@ -35,7 +35,7 @@ func TestArchiveProgressTracksTransferAndCancels(t *testing.T) {
 			mux.HandleFunc("GET /download", wrapHandler(archiveHandler))
 			for _, method := range []string{"GET", "DELETE"} {
 				mux.HandleFunc(method+" /progress/{id}", wrapHandler(func(w http.ResponseWriter, r *http.Request, _ *Context) (int, error) {
-					return archiveDownloadProgressHandler(w, r, d)
+					return downloadProgressHandler(w, r, d)
 				}))
 			}
 			server := httptest.NewServer(LoggingMiddleware(mux))
@@ -65,11 +65,11 @@ func TestArchiveProgressTracksTransferAndCancels(t *testing.T) {
 				t.Fatalf("missing archive ID: status %d", head.StatusCode)
 			}
 			progressPath := "/progress/" + id
-			progress := func() archiveDownloadProgress {
+			progress := func() downloadProgress {
 				t.Helper()
 				res := do(http.MethodGet, progressPath, false)
 				defer res.Body.Close()
-				var p archiveDownloadProgress
+				var p downloadProgress
 				if err := json.NewDecoder(res.Body).Decode(&p); err != nil {
 					t.Fatal(err)
 				}

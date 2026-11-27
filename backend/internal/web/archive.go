@@ -711,32 +711,15 @@ func BuildAndStreamArchive(w http.ResponseWriter, r *http.Request, d *Context, s
 		return http.StatusMethodNotAllowed, nil
 	}
 
-	var download *archiveDownload
+	var download *downloadTransfer
 	transferStatus := "error"
-	if id := r.URL.Query().Get("archiveDownload"); r.Method == http.MethodGet && id != "" {
-		var ctx context.Context
-		var cancel context.CancelFunc
-		download, ctx, cancel = startArchiveDownload(r, d, id)
+	if id := r.URL.Query().Get("archiveDownload"); r.Method == http.MethodGet && id != "" && !r.URL.Query().Has("downloadId") {
+		var finish func(string)
+		download, r, finish = bindDownloadTransfer(w, r, d, id)
 		if download == nil {
 			return http.StatusGone, errors.New("archive download expired or already started")
 		}
-		r = r.WithContext(ctx)
-		controller := http.NewResponseController(w)
-		interrupted := make(chan struct{})
-		stop := context.AfterFunc(ctx, func() {
-			defer close(interrupted)
-			_ = controller.SetWriteDeadline(time.Now())
-		})
-		defer func() {
-			if !stop() {
-				<-interrupted
-			}
-			if ctx.Err() != nil {
-				transferStatus = "cancelled"
-			}
-			download.finish(transferStatus)
-			cancel()
-		}()
+		defer func() { finish(transferStatus) }()
 	}
 
 	idx := indexing.GetIndex(source)
@@ -803,7 +786,7 @@ func BuildAndStreamArchive(w http.ResponseWriter, r *http.Request, d *Context, s
 
 type archiveStreamWriter struct {
 	writer   http.ResponseWriter
-	download *archiveDownload
+	download *downloadTransfer
 	started  bool
 }
 

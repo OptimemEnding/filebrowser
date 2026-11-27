@@ -13,10 +13,6 @@
     >
       {{ ext }}
     </button>
-    <label class="archive-delivery-option">
-      <input v-model="directArchive" type="checkbox" />
-      {{ t("fileLoading.archiveDownloadDirect") }}
-    </label>
   </div>
   <div v-if="!hasDownloads && (!currentPrompt?.confirm)" class="card-content lonely-message">
     <span>{{ t("files.lonely") }}</span>
@@ -35,14 +31,14 @@
             <i class="material-symbols file-icon">insert_drive_file</i>
             <div class="file-info">
               <p class="file-name">{{ download.name }}</p>
-              <div v-if="download.archiveRequest" class="archive-progress" role="status">
+              <div v-if="download.archiveRequest || download.size === 0" class="transfer-progress" role="status">
                 <progress v-if="['pending', 'preparing', 'downloading'].includes(download.status)"
                   :aria-label="download.name" />
-                <span>{{ archiveStatus(download) }}</span>
+                <span>{{ transferStatus(download) }}</span>
               </div>
               <ProgressBar v-else
                 :val="download.status === 'completed'
-                  ? t('prompts.completed')
+                  ? t('fileLoading.downloadTransferComplete')
                   : download.status === 'error'
                     ? t('prompts.error')
                     : download.loaded
@@ -97,7 +93,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, useTemplateRef, watch } from "vue";
+import { computed, useTemplateRef, watch } from "vue";
 import { useI18n } from "@/i18n/index.ts";
 import { getters, state } from "@/store/index.ts";
 import { downloadManager } from "@/utils/downloadManager.ts";
@@ -125,7 +121,6 @@ const vFocus = {
 };
 
 const formats = { zip: "zip", "tar.gz": "tar.gz" } as const;
-const directArchive = ref(false);
 
 const list = useTemplateRef<HTMLElement>("list");
 const currentPrompt = computed(() => props.promptId == null
@@ -159,19 +154,21 @@ watch(
   () => void virtual.refresh(),
 );
 
-function archiveStatus(download: DownloadItem): string {
+function transferStatus(download: DownloadItem): string {
   switch (download.status) {
     case "pending":
     case "preparing":
-      return t("fileLoading.archiveDownloadPreparing");
+      return download.archiveRequest
+        ? t("fileLoading.archiveDownloadPreparing")
+        : t("fileLoading.downloadPreparing");
     case "cancelled":
-      return t("fileLoading.archiveDownloadCancelled");
+      return t("fileLoading.downloadCancelled");
     case "completed":
-      return t("prompts.completed");
+      return t("fileLoading.downloadTransferComplete");
     case "error":
       return t("prompts.error");
     default:
-      return t("fileLoading.archiveDownloadTransferred", { size: getHumanReadableFilesize(download.loaded) });
+      return t("fileLoading.downloadTransferred", { size: getHumanReadableFilesize(download.loaded) });
   }
 }
 
@@ -182,7 +179,7 @@ function formatDownloadError(download: DownloadItem): string {
 function handleFormatSelect(format: string) {
   const confirm = currentPrompt.value?.confirm;
   if (typeof confirm === "function") {
-    confirm(format, directArchive.value);
+    confirm(format);
   }
 }
 
@@ -193,9 +190,7 @@ async function retryDownload(id: number) {
   downloadManager.remove(id);
   try {
     const archive = download.archiveRequest;
-    await resourcesApi.download(archive?.format ?? null, archive?.files ?? [download.file], download.shareHash, {
-      directArchive: archive?.directArchive,
-    });
+    await resourcesApi.download(archive?.format ?? null, archive?.files ?? [download.file], download.shareHash);
   } catch (err) {
     console.error("Retry download failed:", err);
   }
@@ -216,14 +211,7 @@ async function retryDownload(id: number) {
   margin-bottom: 0.5rem;
 }
 
-.archive-delivery-option {
-  display: flex;
-  align-items: center;
-  gap: 0.5em;
-  margin-top: 1em;
-}
-
-.archive-progress {
+.transfer-progress {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -231,7 +219,7 @@ async function retryDownload(id: number) {
   font-size: 0.875rem;
 }
 
-.archive-progress progress {
+.transfer-progress progress {
   accent-color: var(--primaryColor);
   width: 6em;
 }

@@ -31,8 +31,9 @@ const (
 var errStreamRangeInvalid = errors.New("invalid byte range")
 
 type ServeSingleFileOptions struct {
-	ForceInline bool
-	RangeOnly   bool
+	ForceInline   bool
+	RangeOnly     bool
+	TrackDownload bool
 }
 
 func viewGrantScope(d *Context, sourceName string) string {
@@ -544,6 +545,13 @@ func ServeSingleFile(w http.ResponseWriter, r *http.Request, d *Context, source 
 	w.Header().Set("Cache-Control", "private, no-cache")
 	w.Header().Set("ETag", fmt.Sprintf(`"%x-%x"`, fileInfo.ModTime().UnixNano(), fileInfo.Size()))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if opts.TrackDownload && r.Method == http.MethodHead && r.Header.Get("X-Track-Download") == "1" {
+		status, err := prepareDownloadTransfer(w, d, downloadProgressHeader, true)
+		if status == http.StatusOK {
+			w.Header().Set("Content-Length", strconv.FormatInt(fileInfo.Size(), 10))
+		}
+		return status, err
+	}
 
 	var reader io.ReadSeeker = fd
 	if d.Share.Hash != "" && d.Share.MaxBandwidth > 0 {

@@ -24,9 +24,9 @@ export default function downloadFiles(items) {
       // Multiple files download with user confirmation
       mutations.showPrompt({
         name: "download",
-        confirm: (format, directArchive = false) => {
+        confirm: (format) => {
           mutations.closeTopPrompt();
-          void startDownload(format, items, state.shareInfo.hash, { directArchive });
+          void startDownload(format, items, state.shareInfo.hash);
         },
       });
     }
@@ -39,18 +39,18 @@ export default function downloadFiles(items) {
     // Multiple files download with user confirmation
     mutations.showPrompt({
       name: "download",
-      confirm: (format, directArchive = false) => {
+      confirm: (format) => {
         mutations.closeTopPrompt();
-        void startDownload(format, items, "", { directArchive });
+        void startDownload(format, items);
       },
     });
   }
 }
 
-async function startDownload(config, files, hash = "", options = {}) {
+async function startDownload(config, files, hash = "") {
   try {
     notify.showSuccessToast("Downloading...");
-    await resourcesApi.download(config, files, hash, { directArchive: options.directArchive });
+    await resourcesApi.download(config, files, hash);
   } catch (e) {
     if (e?.name === "AbortError" || e?.message?.includes("aborted") || e?.message?.includes("cancelled")) {
       return;
@@ -76,9 +76,9 @@ export function showShareDownloadPrompt(items) {
 
   mutations.showPrompt({
     name: "download",
-    confirm: (format, directArchive = false) => {
+    confirm: (format) => {
       mutations.closeTopPrompt();
-      void startDownload(format, items, state.shareInfo?.hash || "", { directArchive });
+      void startDownload(format, items, state.shareInfo?.hash || "");
     },
   });
 }

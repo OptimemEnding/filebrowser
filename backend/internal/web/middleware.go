@@ -133,6 +133,7 @@ func withHashFileHelper(fn handleFunc) handleFunc {
 			(r.Method == "GET" && strings.Contains(r.URL.Path, "/media/subtitles")) ||
 			((r.Method == http.MethodGet || r.Method == http.MethodHead) && strings.Contains(r.URL.Path, "/resources/download")) ||
 			strings.Contains(r.URL.Path, "/resources/archive-download/") ||
+			strings.Contains(r.URL.Path, "/resources/progress/download/") ||
 			(r.Method == "GET" && strings.Contains(r.URL.Path, "/resources/view")) ||
 			(r.Method == "GET" && strings.Contains(r.URL.Path, "/media/stream")) {
 			return fn(w, r, data)
